@@ -1,0 +1,82 @@
+# Compiled Object Files
+*.o
+*.obj
+*.elf
+
+# Compiled Executables
+*.exe
+*.out
+*.app
+image_diff_baseline
+image_diff_accelarated
+
+# HLS Project Files
+*.log
+*.jou
+*.str
+*.rpt
+
+# HLS Build Directories
+*_hls/
+solution*/
+.autopilot/
+.Xil/
+
+# Vivado/Vitis Files
+*.cache/
+*.hw/
+*.ip_user_files/
+*.sim/
+vivado*.backup*/
+*.xpr.user
+
+# Synthesis Results
+*.bit
+*.bin
+*.ltx
+
+# Temporary Files
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE Files
+.vscode/
+.idea/
+*.sublime-*
+*.code-workspace
+
+# Build Artifacts
+build/
+bin/
+obj/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.pytest_cache/
+venv/
+
+# LaTeX
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.pdf_tex
+*.bbl
+*.blg
+
+# Test Output
+test_results/
+output_images/
+*.pgm
+*.ppm
+*.bmp
+
+# Generated Files
+*_generated*
