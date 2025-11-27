@@ -1,8 +1,12 @@
 # Computer Architecture Labs
+**Hardware Acceleration and High-Level Synthesis**  
+**Author:** Fraidakis Ioannis  
+**Institution:** Aristotle University of Thessaloniki  
+**Date:** 2025  
 
 This repository contains laboratory assignments for a Computer Architecture course, focusing on hardware acceleration, FPGA design, and high-level synthesis (HLS).
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 computer-architecture-labs/
@@ -12,7 +16,7 @@ computer-architecture-labs/
 └── README.md       # This file
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 Each lab is self-contained with its own documentation, source code, and build instructions. Navigate to the respective lab directory to get started.
 
@@ -23,7 +27,7 @@ Each lab is self-contained with its own documentation, source code, and build in
   - Xilinx Vitis HLS (for hardware synthesis)
   - Basic understanding of image processing
 
-## 📚 Labs Overview
+## Labs Overview
 
 ### Lab 1: Image Difference with Hardware Acceleration
 
@@ -45,7 +49,7 @@ Implements a posterized image difference algorithm with both baseline (software)
 
 *Lab 3 content will be added here*
 
-## 🛠️ Development Setup
+## Development Setup
 
 1. **Clone the repository:**
    ```bash
@@ -60,7 +64,8 @@ Implements a posterized image difference algorithm with both baseline (software)
 
 3. **Follow the lab-specific README for build and run instructions**
 
-## 📖 Additional Resources
+---
 
-- [Xilinx Vitis HLS Documentation](https://www.xilinx.com/products/design-tools/vitis/vitis-hls.html)
-- [Computer Architecture: A Quantitative Approach](https://www.elsevier.com/books/computer-architecture/hennessy/978-0-12-811905-1)
+**Course:** Computer Architecture  
+**Institution:** Aristotle University of Thessaloniki  
+**Semester:** Fall 2025
