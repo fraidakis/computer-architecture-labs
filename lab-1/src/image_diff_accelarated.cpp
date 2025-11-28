@@ -36,11 +36,21 @@ void IMAGE_DIFF_POSTERIZE(
     uint512_t *B,
     uint512_t *C)
 {
-// HLS Interface Pragmas - Configure AXI interfaces for memory access
-#pragma HLS INTERFACE m_axi port = A offset = slave bundle = gmemA depth = IMAGE_SIZE / 64
-#pragma HLS INTERFACE m_axi port = B offset = slave bundle = gmemB depth = IMAGE_SIZE / 64
-#pragma HLS INTERFACE m_axi port = C offset = slave bundle = gmemC depth = IMAGE_SIZE / 64
-#pragma HLS INTERFACE s_axilite port = return bundle = control
+/* HLS Interface Pragmas - Configure AXI interfaces for memory access:
+  - m_axi: Allows the hardware kernel to initiate memory transactions of large data
+  - s_axilite: AXI-Lite interface for control signals (pass arguments, start the kernel, etc) NOT large data
+
+  - port: Specifies the function argument this interface applies to
+  - offset = slave: Indicates that the base address is provided via a slave AXI-Lite interface
+                    (software passes a pointer (address) when calling the accelerator)
+  - bundle: HLS creates separate physical AXI ports to allow simultaneous memory access
+  - depth: Specifies the size of the array for simulation (in terms of number of 512-bit words)
+
+*/
+#pragma HLS INTERFACE m_axi port=A offset=slave bundle=gmemA depth=IMAGE_SIZE / 64
+#pragma HLS INTERFACE m_axi port=B offset=slave bundle=gmemB depth=IMAGE_SIZE / 64
+#pragma HLS INTERFACE m_axi port=C offset=slave bundle=gmemC depth=IMAGE_SIZE / 64
+#pragma HLS INTERFACE s_axilite port=return bundle=control
 
 /**
  * Main processing loop - Iterates over 512-bit chunks (64 pixels at a time)
