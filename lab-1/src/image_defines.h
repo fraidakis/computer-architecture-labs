@@ -2,7 +2,7 @@
 #define IMAGE_DEFINES_H
 
 #include <stdint.h>
-#include <ap_int.h>
+#include <ap_int.h> // Xilinx arbitrary precision integer header
 
 // Define a 512-bit wide type to match the hardware bus
 typedef ap_uint<512> uint512_t;

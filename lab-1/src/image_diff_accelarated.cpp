@@ -45,7 +45,6 @@ void IMAGE_DIFF_POSTERIZE(
                     (software passes a pointer (address) when calling the accelerator)
   - bundle: HLS creates separate physical AXI ports to allow simultaneous memory access
   - depth: Specifies the size of the array for simulation (in terms of number of 512-bit words)
-
 */
 #pragma HLS INTERFACE m_axi port=A offset=slave bundle=gmemA depth=IMAGE_SIZE / 64
 #pragma HLS INTERFACE m_axi port=B offset=slave bundle=gmemB depth=IMAGE_SIZE / 64
@@ -59,9 +58,11 @@ void IMAGE_DIFF_POSTERIZE(
   Main_Loop:
   for (int chunk_idx = 0; chunk_idx < IMAGE_SIZE / 64; chunk_idx++)
   {
+    /* Pipeline the loop to achieve II=1 (initiation interval of 1 cycle)
+      This means a new loop iteration starts every clock cycle */
     #pragma HLS PIPELINE II = 1
 
-    // Read 64 pixels (512 bits) from both input images in one clock cycle
+    // Read 64 pixels (512 bits) from both input images
     const uint512_t chunk_A = A[chunk_idx];
     const uint512_t chunk_B = B[chunk_idx];
     uint512_t chunk_C = 0;
@@ -73,6 +74,7 @@ void IMAGE_DIFF_POSTERIZE(
     Process_Loop:
     for (int pixel_idx = 0; pixel_idx < 64; pixel_idx++)
     {
+      // Full unroll to create parallelism for 64 pixels
       #pragma HLS UNROLL
 
       // Extract byte 'pixel_idx' (8 bits) from the 512-bit chunk
