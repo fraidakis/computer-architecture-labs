@@ -1,0 +1,386 @@
+\documentclass[12pt,a4paper]{article}
+
+% Essential packages
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\usepackage{titling}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{placeins}
+
+% Additional packages for beautification
+\usepackage[skins,breakable]{tcolorbox}
+\usepackage{fontspec}
+\usepackage{booktabs}
+\usepackage{mdframed}
+\usepackage{caption}
+\usepackage{soul}
+\usepackage{verbatim}
+
+\usepackage{array}
+\setlength{\tabcolsep}{6pt}
+
+% Color definitions
+\definecolor{titleblue}{RGB}{0,76,151}
+\definecolor{myblue}{RGB}{25,25,112}
+\definecolor{lightbluegray}{RGB}{220,230,245}  
+\definecolor{mygreen}{RGB}{0,128,0}
+\definecolor{mygray}{RGB}{245,245,245}
+
+% Custom tcolorbox styles
+\tcbset{
+    mybox/.style={
+        enhanced,
+        colback=myblue!3,
+        colframe=myblue,
+        arc=2mm,
+        boxrule=0.8pt
+    }
+}
+
+\newtcolorbox{mytitledbox}[1]{
+    enhanced,
+    colback=myblue!3,
+    colframe=titleblue!50,
+    arc=2mm,
+    boxrule=1.1pt,
+    title={\textcolor{white}{\textbf{#1}}},
+    coltitle=white,
+    fonttitle=\bfseries,
+    colbacktitle=titleblue!50
+}
+
+\newtcolorbox{solutionbox}{
+    enhanced,
+    colback=lightbluegray!80,  
+    colframe=titleblue!50,     
+    arc=1.5mm,                
+    boxrule=0.15pt,            
+    top=2mm,                 
+    bottom=2mm,
+    before=\vspace{2mm},       % Space before box
+    after=\vspace{2mm},     
+    breakable                  % For long solutions
+}
+
+% Header and footer setup
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.8pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancyhead[L]{\textsf{\textcolor{myblue}{Computer Architecture Laboratory}}}
+\fancyhead[R]{\textsf{\textcolor{myblue}{Lab 1 Report}}}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14.5pt}
+\addtolength{\topmargin}{-2.5pt}
+
+% Custom section styling
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{myblue}}
+  {\thesection}{1em}{}[\titlerule]
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{myblue}}
+  {\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries\color{myblue}}
+  {\thesubsubsection}{1em}{}
+
+% Listing style for code
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{mygray},
+    commentstyle=\color{mygreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{gray},
+    stringstyle=\color{purple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    framesep=5pt,
+    framerule=0.5pt,
+    framexleftmargin=6pt,
+    framexrightmargin=6pt,
+    framextopmargin=4pt,
+    framexbottommargin=4pt,
+}
+\lstset{style=mystyle}
+
+% ==========================================
+% TITLE PAGE
+% ==========================================
+
+\title{
+    \vspace*{2cm}
+    \Huge\textbf{\textsf{Computer Architecture Report}}\\
+    \vspace{0.4cm}
+    \Large\textsf{Lab 1: H/W accelerator design using Vitis HLS}
+    \vspace{1cm}
+    \rule{\textwidth}{1pt}
+}
+
+\author{
+    \Large\begin{tabular}{rl}
+        \textbf{Fraidakis Ioannis}\\ % Change Name if necessary
+    \end{tabular}
+}
+\date{\Large\textsf{November 2025}}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+\begin{tcolorbox}[mybox]
+This laboratory exercise focuses on the design and implementation of a hardware accelerator using High-Level Synthesis (HLS) with Xilinx Vitis.
+The primary objective is to develop an image processing module, specifically the \texttt{IMAGE\_DIFF\_POSTERIZE} kernel.
+This accelerator computes the absolute difference between two input images and applies a posterization thresholding logic to generate a simplified output image.
+The lab explores the HLS design flow, including C++ synthesis, baseline performance analysis, co-simulation, and performance optimization using pragmas to exploit parallelism and improve throughput.
+\end{tcolorbox}
+
+\section{Question 1: Design}
+
+The core functionality of the accelerator is to process two input matrices (images) $A$ and $B$ of dimensions $HEIGHT \times WIDTH$.
+The system calculates the absolute difference $D$ for every pixel and maps it to specific intensity levels based on predefined thresholds.
+\subsection{Algorithmic Logic}
+The operation is performed pixel-wise for indices $(i, j)$:
+\begin{enumerate}
+    \item \textbf{Difference Calculation:} Calculate the absolute difference: 
+    $$D = |A[i][j] - B[i][j]|$$
+    \item \textbf{Posterization Thresholding:} The output $C[i][j]$ is determined by:
+    $$
+    C[i][j] = 
+    \begin{cases} 
+    0 & \text{if } D < 32 \quad (\text{Black}) \\
+    128 & \text{if } 32 \le D < 96 \quad (\text{Gray}) \\
+    255 & \text{if } D \ge 96 \quad (\text{White})
+    \end{cases}
+    $$
+\end{enumerate}
+
+In the HLS implementation, the two input images and the output image are represented as 1D arrays (or equivalent pointers) in memory.
+\subsection{Testbench Structure}
+
+The C/C++ testbench is responsible for:
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=1mm]
+    \item Generating or loading input images $A$ and $B$ (e.g.\ synthetic patterns).
+    \item Executing pure software reference implementation to produce a golden output $C_{\text{ref}}$.
+    \item Invoking the HLS function \texttt{IMAGE\_DIFF\_POSTERIZE} to produce $C_{\text{hls}}$.
+    \item Comparing $C_{\text{hls}}$ with $C_{\text{ref}}$ and reporting mismatches.
+\end{itemize}
+
+\section{Question 2: Baseline Synthesis}
+
+
+
+
+For the baseline implementation, the function is synthesized without any directives. This provides a reference design point in terms of latency and resource utilization.
+
+The main synthesis metrics reported by Vitis~HLS for $HEIGHT = WIDTH = 256$ are summarized in Table~\ref{tab:baseline_results}. The estimated clock period refers to the clock period constraint achieved during synthesis, while the worst-case latency corresponds to the maximum number of clock cycles required to process one $256 \times 256$ image pair.
+
+\vspace{5mm}
+
+\begin{mytitledbox}{Baseline Synthesis Results (256x256)}
+    \centering
+    \captionof{table}{Baseline (unoptimized) synthesis results for \texttt{IMAGE\_DIFF\_POSTERIZE}.}
+    \label{tab:baseline_results}
+    
+    \vspace{0.2cm}
+
+    \begin{tabular}{@{}l c@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{Value}} \\
+        \midrule[0.8pt]
+        Target Clock Period & 10.00 ns \\
+        Estimated Clock & \textbf{5.093 ns} \\ 
+        Worst-Case Latency (cycles) & \textbf{65538} \\ 
+        Worst-Case Latency (time) & \textbf{0.655 ms} \\ 
+        \midrule[0.8pt]
+        \multicolumn{2}{c}{\textbf{Resource Utilization}} \\
+        \midrule[0.8pt]
+        DSP48E & \textbf{0} \\ 
+        BRAM & \textbf{0} \\ 
+        Flip-Flops (FF) & \textbf{37} \\ 
+        LUTs & \textbf{152} \\ 
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{mytitledbox}
+
+\newpage
+We observe that the baseline configuration already meets a fairly tight clock period (around 5.09 ns, better than the 10 ns target), but the latency is on the order of the total number of pixels: roughly one clock cycle per pixel, plus control overhead. The resource usage is negligible relative to the available resources of the target device, as only a very small number of LUTs and flip-flops are used, and no DSPs or BRAMs are inferred.
+
+
+\section{Question 3 -- Co-Simulation}
+
+To validate the functional correctness of the generated RTL, C/RTL co-simulation is executed in Vitis~HLS.
+The same testbench used for C-simulation is reused, but now the HLS-generated RTL is simulated at the register-transfer level.
+
+\vspace{3mm}
+
+\begin{mytitledbox}{Co-Simulation Results}
+\begin{solutionbox}
+The co-simulation confirms that the RTL implementation is bit-accurate with respect to the software reference.
+No mismatches were observed between $C_{\text{hls}}$ and $C_{\text{ref}}$ for the tested input images.
+Table~\ref{tab:cosim_results} summarizes the performance-related statistics reported by the co-simulation for the baseline design.
+\end{solutionbox}
+
+
+\begin{table}[H]
+    \centering
+    \caption{Co-simulation performance summary (Baseline).}
+    \begin{tabular}{l c}
+        \toprule
+        \textbf{Metric} & \textbf{Value} \\
+        \midrule
+        Total Execution Time [ms]  & \textbf{0.655} \\
+        Minimum Latency [cycles]  & \textbf{65536}  \\
+        Average Latency [cycles]  & \textbf{65536}  \\
+        Maximum Latency [cycles]  & \textbf{65536}  \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:cosim_results}
+\end{table}
+\end{mytitledbox}
+
+\vspace{2mm}
+
+The reported latency of 65536 cycles from RTL co-simulation is consistent with the expected behavior of the baseline design (one iteration per pixel).
+
+\section{Question 4: Optimization}
+
+This section details the steps taken to improve the performance of the accelerator, focusing on loop latency and throughput.
+
+\subsection{Optimization Directives}
+To accelerate the design, the implementation utilizes wide memory access types (\texttt{uint512\_t}) to load 64 pixels simultaneously, combined with specific HLS pragmas.
+
+\subsubsection*{Micro-Architectural Rationale}
+The optimized kernel operates on 512-bit words (\texttt{uint512\_t}), each containing 64 packed 8-bit pixels.
+The outer \texttt{Main\_Loop} iterates over these chunks, resulting in:
+\[
+\frac{IMAGE\_SIZE}{64} = \frac{256 \times 256}{64} = 1024
+\]
+iterations for the target image size.
+By applying \texttt{\#pragma HLS PIPELINE II=1} to this loop, the compiler schedules the design such that a new 64-pixel chunk is accepted every clock cycle in steady state.
+The reported pipeline depth of approximately 4 cycles corresponds to the internal combinational stages required to extract pixels, compute the absolute difference, evaluate the two thresholds, and repack the result.
+Therefore, the total latency of the main loop is well approximated by:
+\[
+Latency \approx N + Depth \approx 1024 + 4 \approx 1028 \text{ cycles,}
+\]
+which matches the C-synthesis estimate.
+Any remaining gap between synthesis and RTL co-simulation is attributed to AXI transaction overheads and memory interface effects.
+
+\begin{mytitledbox}{Applied Directives}
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=2mm]
+
+    \item \textbf{\texttt{ap\_uint<512>} data packing (\texttt{uint512\_t})}: 
+    The optimized implementation introduces a wide type which packs \textbf{64 grayscale pixels} of 8 bits each into a single memory element. As a result, each global memory read loads 64 pixels simultaneously, and each write stores 64 output pixels at once. This choice aligns naturally with the AXI data width and enables high memory bandwidth utilization with minimal packing/unpacking overhead.
+
+    \item \textbf{Interface directives (\texttt{m\_axi}, \texttt{s\_axilite})}: 
+    The input ($A, B$) and output ($C$) ports are mapped to AXI4-Master interfaces (\texttt{m\_axi}) with \textbf{512-bit data width} and depth \texttt{IMAGE\_SIZE/64}, each on a separate bundle, to enable efficient burst-mode access to off-chip global memory. The control signals are mapped to an AXI4-Lite interface (\texttt{s\_axilite}) for interaction with the host. These directives complement the \texttt{ap\_uint<512>} packing strategy by transferring one full 64-pixel chunk per beat, ensuring that the highly parallel datapath is continuously fed and that results are written back efficiently.
+
+    \item \textbf{\texttt{\#pragma HLS PIPELINE II=1}}: 
+    Applied to the \texttt{Main\_Loop} to enforce an Initiation Interval (II) of 1. This ensures that the hardware initiates the processing of a new 512-bit data chunk (containing 64 pixels) every clock cycle, significantly increasing instruction-level parallelism and sustaining continuous throughput across the 1024 chunk iterations for a $256\times256$ image.
+
+    \item \textbf{\texttt{\#pragma HLS UNROLL}}: 
+    Applied to the inner loop \texttt{Process\_Loop}, which iterates over the 64 bytes inside each 512-bit word. Full unrolling creates 64 parallel processing lanes, so all 64 pixels in a chunk are processed in parallel within the same cycle. This transformation is the main source of spatial parallelism and is responsible for the substantial reduction in latency.
+\end{itemize}
+\end{mytitledbox}
+
+
+\subsection{Best Implementation Results}
+
+The table below summarizes the performance of the final optimized design for the $256 \times 256$ resolution, compared to the baseline (unoptimized) design. The data are taken from the \texttt{solution\_baseline} and \texttt{solution\_accelerated} synthesis reports.
+
+\vspace{1mm}
+
+\begin{mytitledbox}{Optimized Design Results}
+\centering
+\begin{tabular}{@{}p{0.4\textwidth} p{0.25\textwidth} p{0.25\textwidth}@{}}
+\toprule[1.5pt]
+\textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{Baseline}} & \textbf{\textcolor{myblue}{Optimized}} \\
+\midrule[0.8pt]
+Estimated Clock & 5.093 ns & \textbf{7.300 ns} \\
+\rowcolor{lightbluegray!55} Latency (cycles) & 65536 & \textbf{1190} \\
+Total Execution Time & $655.57$ $\mu$s & \textbf{12.55} $\mu$\textbf{s} \\
+\rowcolor{lightbluegray!55} DSP48E & 0 & \textbf{0} \\
+BRAM & 0 & \textbf{0} \\
+\rowcolor{lightbluegray!55} FF & 37 & \textbf{15723} \\
+LUT & 152 & \textbf{29638} \\
+\bottomrule[1.5pt]
+\end{tabular}
+\end{mytitledbox}
+
+\vspace{1mm}
+
+\begin{solutionbox}
+\textbf{Speed-up Calculation:}
+$$ Speedup = \frac{Latency_{Baseline}}{Latency_{Optimized}} = \frac{655.57}{12.55} \approx \mathbf{52.24 \times} $$
+\end{solutionbox}
+
+From Table~\ref{tab:baseline_results} and the optimized results, we see that the total execution time drops from $655.57$ $\mu$s to just $12.55$ $\mu$s, at the cost of a significant increase in LUT and FF usage. Nevertheless, the absolute utilization remains low with respect to the capacity of the \texttt{xcu200} device (about $7\%$ LUTs and $1\%$ FFs of SLR).
+
+\subsection{Scaling Analysis with Varying Width}
+
+In order to study the scaling behavior of the accelerator, experiments were performed by fixing $HEIGHT = 256$ and varying $WIDTH$ in the set $\{64, 128, 256, 512\}$. For each configuration, the design was synthesized and the corresponding latency and execution time were measured. Table~\ref{tab:scaling} summarizes the results.
+
+\begin{mytitledbox}{Latency and Execution Time Scaling (HEIGHT = 256)}
+\begin{table}[H]
+    \centering
+    \caption{Latency and execution time scaling with varying \texttt{WIDTH}.}
+    \begin{tabular}{c c c}
+        \toprule
+        \textbf{WIDTH} &
+        \textbf{Latency [cycles]} &
+        \textbf{Execution Time [ms]} \\
+        \midrule
+        64  & \textbf{326}  & \textbf{3905} \\
+        128 & \textbf{614} & \textbf{6785} \\
+        256 & \textbf{1190} & \textbf{12545} \\
+        512 & \textbf{2342} & \textbf{24065} \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:scaling}
+\end{table}
+
+The latency scales \textbf{linearly} with the total number of pixels ($H \times W$).
+\end{mytitledbox}
+
+\subsection{Explored Optimizations with Limited Benefit}
+
+Beyond the final set of optimizations presented above, we experimented with additional techniques commonly used in Vitis~HLS. For the specific workload of a $256 \times 256$ image (i.e.\ 1024 chunks of 64 pixels), these approaches did not provide a meaningful performance improvement.
+
+\begin{mytitledbox}{Non-beneficial or Marginal Optimizations}
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=2mm]
+    \item \textbf{Aggressive AXI tuning (burst/outstanding):}
+    We increased the maximum burst length and the number of outstanding transactions (e.g.\ read burst up to 64 and read outstanding up to 32).
+    C-synthesis showed identical latency, while LUT/FF usage increased dramatically with no benefit.
+
+    \item \textbf{Task-level \texttt{DATAFLOW}:}
+    We implemented a streaming version that separates the design into \texttt{Read\_Inputs}, \texttt{Compute\_Diff}, and \texttt{Write\_Output} stages connected by \texttt{hls::stream}.
+    Although this is a standard pattern for overlapping memory and computation, our baseline optimized kernel already achieves \textbf{II=1} on 512-bit chunks. As a result, DATAFLOW did not reduce end-to-end latency for this small image and slightly increased the measured total latency ($1190 \rightarrow 1193$ cycles).
+\end{itemize}
+\end{mytitledbox}
+
+\section{Conclusion}
+
+In this laboratory exercise, a hardware accelerator for image differencing and posterization was specified, implemented, and evaluated using Vitis HLS. Starting from a straightforward C/C++ description of the algorithm, a baseline hardware implementation was obtained, and its performance and resource usage were characterized.
+
+Subsequently, HLS directives such as \texttt{PIPELINE} and \texttt{UNROLL} were applied to expose additional parallelism and increase effective memory bandwidth. The optimized design achieved a speed-up of approximately $52.2 \times$ in terms of cycle latency (from 65538 cycles down to 1190 cycles), with still modest resource utilization on the target FPGA.
+
+Overall, the lab demonstrates how high-level synthesis can be used to explore performance/area trade-offs systematically and highlights the importance of memory architecture and loop transformations in achieving high throughput.
+
+\end{document}

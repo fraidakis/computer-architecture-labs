@@ -46,9 +46,9 @@ void IMAGE_DIFF_POSTERIZE(
   - bundle: HLS creates separate physical AXI ports to allow simultaneous memory access
   - depth: Specifies the size of the array for simulation (in terms of number of 512-bit words)
 */
-#pragma HLS INTERFACE m_axi port=A offset=slave bundle=gmemA depth=IMAGE_SIZE/64 max_read_burst_length=64 num_read_outstanding=32
-#pragma HLS INTERFACE m_axi port=B offset=slave bundle=gmemB depth=IMAGE_SIZE/64 max_read_burst_length=64 num_read_outstanding=32
-#pragma HLS INTERFACE m_axi port=C offset=slave bundle=gmemC depth=IMAGE_SIZE/64 max_read_burst_length=64 num_read_outstanding=32
+#pragma HLS INTERFACE m_axi port=A offset=slave bundle=gmemA depth=IMAGE_SIZE/64
+#pragma HLS INTERFACE m_axi port=B offset=slave bundle=gmemB depth=IMAGE_SIZE/64
+#pragma HLS INTERFACE m_axi port=C offset=slave bundle=gmemC depth=IMAGE_SIZE/64
 #pragma HLS INTERFACE s_axilite port=return bundle=control
 
 /**
