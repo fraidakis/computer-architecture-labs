@@ -3,7 +3,7 @@
 #include "image_defines.h"
 
 // Declaration of top-level HW function
-void IMAGE_DIFF_POSTERIZE(uint512_t *A, uint512_t *B, uint512_t *C);
+void IMAGE_DIFF_POSTERIZE(const uint512_t *A,const uint512_t *B, uint512_t *C);
 
 // Software Reference Implementation (for verification)
 void sw_reference_diff_posterize(pixel_t *A, pixel_t *B, pixel_t *C_ref)

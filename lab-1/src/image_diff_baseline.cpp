@@ -7,7 +7,7 @@
 // * visualization of difference magnitudes.
 // */
 //
-//#include "image_defines.h"
+//#include "../inc/image_defines.h"
 //
 ///**
 // * @brief Computes posterized absolute difference between two images
@@ -17,9 +17,9 @@
 // * medium (gray), or large (white).
 // *
 // * Posterization mapping:
-// *   - D < THRESH_LOW :     		   Output = 0   (Black - minimal difference)
-// *   - THRESH_LOW <= D < THRESH_HIGH : Output = 128 (Gray - moderate difference)
-// *   - D >= THRESH_HIGH :      		   Output = 255 (White - significant difference)
+// *   - D < THRESH_LOW :     		   Output = 0   (Black -> minimal difference)
+// *   - THRESH_LOW <= D < THRESH_HIGH : Output = 128 (Gray -> moderate difference)
+// *   - D >= THRESH_HIGH :      		   Output = 255 (White -> significant difference)
 // *
 // * @param[in]  A  Input image A (grayscale, WIDTH x HEIGHT pixels)
 // * @param[in]  B  Input image B (grayscale, WIDTH x HEIGHT pixels)
@@ -38,7 +38,7 @@
 //        const int16_t diff = (int16_t)A[i] - (int16_t)B[i];
 //
 //        // Calculate absolute difference D(i,j) = |A(i,j) - B(i,j)|
-//        const pixel_t abs_diff = (pixel_t)((diff < 0) ? -diff : diff);
+//        const pixel_t abs_diff = (pixel_t)( (diff < 0) ? -diff : diff );
 //
 //        // Apply posterization thresholding and store result
 //        C[i] = (abs_diff < THRESH_LOW) ? 0 : (abs_diff < THRESH_HIGH) ? 128 : 255;

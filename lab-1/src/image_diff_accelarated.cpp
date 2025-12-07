@@ -8,7 +8,7 @@
  *
  */
 
-#include "image_defines.h"
+#include "../inc/image_defines.h"
 
 /**
  * @brief Computes absolute difference between two images with posterization
@@ -32,8 +32,8 @@
  * @note Performance target: 1 cycle per 64-pixel chunk (II=1)
  */
 void IMAGE_DIFF_POSTERIZE(
-    uint512_t *A,
-    uint512_t *B,
+    const uint512_t *A,
+	const uint512_t *B,
     uint512_t *C)
 {
 /* HLS Interface Pragmas - Configure AXI interfaces for memory access:
@@ -46,21 +46,24 @@ void IMAGE_DIFF_POSTERIZE(
   - bundle: HLS creates separate physical AXI ports to allow simultaneous memory access
   - depth: Specifies the size of the array for simulation (in terms of number of 512-bit words)
 */
-#pragma HLS INTERFACE m_axi port=A offset=slave bundle=gmemA depth=IMAGE_SIZE / 64
-#pragma HLS INTERFACE m_axi port=B offset=slave bundle=gmemB depth=IMAGE_SIZE / 64
-#pragma HLS INTERFACE m_axi port=C offset=slave bundle=gmemC depth=IMAGE_SIZE / 64
+#pragma HLS INTERFACE m_axi port=A offset=slave bundle=gmemA depth=IMAGE_SIZE/64 max_read_burst_length=64 num_read_outstanding=32
+#pragma HLS INTERFACE m_axi port=B offset=slave bundle=gmemB depth=IMAGE_SIZE/64 max_read_burst_length=64 num_read_outstanding=32
+#pragma HLS INTERFACE m_axi port=C offset=slave bundle=gmemC depth=IMAGE_SIZE/64 max_read_burst_length=64 num_read_outstanding=32
 #pragma HLS INTERFACE s_axilite port=return bundle=control
 
 /**
  * Main processing loop - Iterates over 512-bit chunks (64 pixels at a time)
  * Pipeline directive ensures throughput of 1 chunk per cycle
  */
+  const int CHUNK_COUNT = IMAGE_SIZE / 64;
+
   Main_Loop:
-  for (int chunk_idx = 0; chunk_idx < IMAGE_SIZE / 64; chunk_idx++)
+  for (int chunk_idx = 0; chunk_idx < CHUNK_COUNT; chunk_idx++)
   {
     /* Pipeline the loop to achieve II=1 (initiation interval of 1 cycle)
-      This means a new loop iteration starts every clock cycle */
+       This means a new loop iteration starts every clock cycle */
     #pragma HLS PIPELINE II = 1
+	#pragma HLS LOOP_TRIPCOUNT min=4 max=2048
 
     // Read 64 pixels (512 bits) from both input images
     const uint512_t chunk_A = A[chunk_idx];
@@ -82,8 +85,7 @@ void IMAGE_DIFF_POSTERIZE(
       const pixel_t pixel_B = chunk_B.range((pixel_idx * 8) + 7, pixel_idx * 8);
 
       // Compute absolute difference
-      const int16_t diff = (int16_t)pixel_A - (int16_t)pixel_B;
-      const pixel_t abs_diff = (pixel_t)((diff < 0) ? -diff : diff);
+      const pixel_t abs_diff = (pixel_A > pixel_B) ? (pixel_A - pixel_B) : (pixel_B - pixel_A);
 
       // Apply three-level posterization based on thresholds
       const pixel_t posterized_value = (abs_diff < THRESH_LOW) ? 0 : (abs_diff < THRESH_HIGH) ? 128 : 255;
@@ -92,7 +94,7 @@ void IMAGE_DIFF_POSTERIZE(
       chunk_C.range((pixel_idx * 8) + 7, pixel_idx * 8) = posterized_value;
     }
 
-    // Write 64 processed pixels (512 bits) to output image in one clock cycle
+    // Write 64 processed pixels (512 bits) to output image
     C[chunk_idx] = chunk_C;
   }
 }
