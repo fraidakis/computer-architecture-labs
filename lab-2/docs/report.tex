@@ -354,6 +354,91 @@ static hls::stream<uint512_t> stream_filt("s_filt");
 
 \end{mytitledbox}
 
+\subsection{Loop-Level Latency Breakdown}
+
+The Vitis HLS Performance \& Resource Estimates provide detailed loop-level latency analysis, revealing the bottlenecks in each implementation.
+
+\begin{table}[H]
+    \centering
+    \caption{V1 loop-level breakdown: Sequential three-stage pipeline.}
+    \label{tab:v1_breakdown}
+    
+    \begin{tabular}{@{}l r r@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Module / Loop}} & \textbf{\textcolor{myblue}{Latency (cycles)}} & \textbf{\textcolor{myblue}{\% of Total}} \\
+        \midrule[0.8pt]
+        \texttt{IMAGE\_DIFF\_POSTERIZE} (Top) & \textbf{67,632} & 100\% \\
+        \midrule
+        \quad \texttt{Pipeline\_Posterize\_Main\_Loop} & 1,027 & 1.5\% \\
+        \rowcolor{lightbluegray!55} \quad \texttt{Pipeline\_Filter\_Row\_Filter\_Col} & \textbf{65,551} & \textbf{97.0\%} \\
+        \quad \texttt{Pipeline\_Pack\_Main\_Loop} & 1,027 & 1.5\% \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\begin{solutionbox}
+\textbf{V1 Bottleneck Analysis:}
+The filter stage (\texttt{Pipeline\_Filter\_Row\_Filter\_Col}) accounts for \textbf{97\%} of total latency. This is because:
+\begin{itemize}
+    \item The 2D array access pattern with row-by-row processing creates dependencies
+    \item Despite array partitioning, the nested loop structure limits parallelism
+    \item Each row requires accessing three rows of the 2D buffer for convolution
+\end{itemize}
+\end{solutionbox}
+
+\begin{table}[H]
+    \centering
+    \caption{V2 loop-level breakdown: Sequential with line buffer optimization.}
+    \label{tab:v2_breakdown}
+    
+    \begin{tabular}{@{}l r r@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Module / Loop}} & \textbf{\textcolor{myblue}{Latency (cycles)}} & \textbf{\textcolor{myblue}{\% of Total}} \\
+        \midrule[0.8pt]
+        \texttt{IMAGE\_DIFF\_POSTERIZE} (Top) & \textbf{3,104} & 100\% \\
+        \midrule
+        \quad \texttt{Pipeline\_Posterize\_Loop} & 1,027 & 33.2\% \\
+        \rowcolor{lightbluegray!55} \quad \texttt{Pipeline\_Filter\_Loop} & 1,042 & 33.6\% \\
+        \quad \texttt{Pipeline\_Write\_Loop} & 1,027 & 33.2\% \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\begin{solutionbox}
+\textbf{V2 Optimization Strategy:}
+By switching to line buffers and a sliding window approach, V2 achieves:
+\begin{itemize}
+    \item \textbf{63× faster} filter stage (1,032 vs 65,551 cycles)
+    \item Balanced stage latencies: Posterize (1,027), Filter (1,032), Write (1,027)
+    \item The line buffer stores only 2 rows instead of the full frame
+\end{itemize}
+However, stages still execute \textbf{sequentially}, so total latency = $\sum$ stage latencies.
+\end{solutionbox}
+
+\begin{table}[H]
+    \centering
+    \caption{V3 module-level breakdown: Dataflow streaming architecture.}
+    \label{tab:v3_breakdown}
+    
+    \begin{tabular}{@{}l r@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Module / Function}} & \textbf{\textcolor{myblue}{Latency (cycles)}} \\
+        \midrule[0.8pt]
+        \texttt{IMAGE\_DIFF\_POSTERIZE} (Top) & \textbf{1,049} \\
+        \midrule
+        \quad \texttt{entry\_proc} & 0 \\
+        \quad \texttt{compute\_diff\_wide} & 1,035 \\
+        \rowcolor{lightbluegray!55} \quad \texttt{apply\_filter\_wide} & \textbf{1,042} \\
+        \quad \texttt{write\_result\_wide} & 1,035 \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\begin{solutionbox}
+\textbf{V3 Dataflow Parallelism:}
+With \texttt{\#pragma HLS DATAFLOW}, all three functions execute \textbf{concurrently}. The total latency equals the \textbf{maximum} stage latency (1,042 cycles for \texttt{apply\_filter\_wide}) plus minimal overhead, achieving \textbf{1,049 cycles}---approaching the theoretical minimum of 1,024 cycles for a 256×256 image with 64 pixels/cycle throughput.
+\end{solutionbox}
+
 \subsection{Analysis}
 
 \begin{solutionbox}
@@ -372,7 +457,6 @@ static hls::stream<uint512_t> stream_filt("s_filt");
 \end{itemize}
 \end{solutionbox}
 
-\newpage
 
 \section{Vitis IDE Execution Results}
 
@@ -455,8 +539,6 @@ The following results are obtained from running the accelerator on actual FPGA h
 \end{table}
 
 \end{mytitledbox}
-
-\newpage
 
 \section{Performance Comparison Summary}
 
