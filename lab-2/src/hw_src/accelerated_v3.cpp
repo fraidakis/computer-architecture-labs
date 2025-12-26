@@ -13,23 +13,8 @@
  * - Sliding window operates on 512-bit chunks.
  */
 
-#include "../inc/image_defines.h"
+#include "../inc/hls_helpers.h"
 #include <hls_stream.h>
-
-// --------------------------------------------------------------------------
-// Helper Functions
-// --------------------------------------------------------------------------
-static inline uint8_t posterize(uint8_t abs_diff)
-{
-#pragma HLS INLINE
-    return (uint8_t)((abs_diff < THRESH_LOW) ? 0 : (abs_diff < THRESH_HIGH) ? 128 : 255);
-}
-
-static inline uint8_t clip_u8(int x)
-{
-#pragma HLS INLINE
-    return (uint8_t)(x < 0 ? 0 : (x > 255 ? 255 : x));
-}
 
 // --------------------------------------------------------------------------
 // Stage 1: Full-Width Difference & Posterization
