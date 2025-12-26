@@ -165,7 +165,7 @@ This laboratory exercise extends the previous lab by adding a 3×3 sharpening fi
     \item \textbf{Posterization}: Map $D$ to discrete levels (0, 128, or 255)
     \item \textbf{Sharpen Filter}: Apply a Laplacian-based 3×3 convolution kernel
 \end{enumerate}
-The lab explores three different architectural implementations (V1, V2, V3) to optimize throughput and resource utilization, analyzing trade-offs between memory access patterns, dataflow parallelism, and hardware complexity.
+Additionally, three different architectural implementations (V1, V2, V3) were developed to explore optimization strategies for throughput and resource utilization, analyzing trade-offs between memory access patterns, dataflow parallelism, and hardware complexity. These versions were not part of the lab requirements but were implemented as a personal exploration of HLS design techniques.
 \end{tcolorbox}
 
 \section{Algorithm Description}
@@ -196,14 +196,15 @@ The image processing pipeline consists of three stages:
     0 & -1 & 0
     \end{bmatrix}
     $$
-    Output: $C[i][j] = \text{clip}(5 \cdot P[i][j] - P[i-1][j] - P[i+1][j] - P[i][j-1] - P[i][j+1])$
+    The convolution output is computed as:
+    $$C[i][j] = 5 \cdot P[i][j] - P[i-1][j] - P[i+1][j] - P[i][j-1] - P[i][j+1]$$
+    The result is then clamped to the valid pixel range:
+    $$C[i][j] = \min(255, \max(0, C[i][j]))$$
 \end{enumerate}
 
 \subsection{Memory Interface}
 
 All implementations use 512-bit wide AXI master interfaces (64 pixels per memory transaction). This aligns with the DDR memory bus width and maximizes memory bandwidth utilization.
-
-\newpage
 
 \section{Implementation Versions}
 
@@ -215,7 +216,7 @@ This section describes the three accelerator implementations and their architect
 \textbf{Architecture Overview:}
 \begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=1mm]
     \item Three sequential stages that execute one after another
-    \item Uses 2D local BRAM buffers (\texttt{C\_tmp[HEIGHT][PADDED\_STRIDE]}, \texttt{C\_filt})
+    \item Uses 2D local BRAM buffers (\texttt{C\_tmp[HEIGHT][PADDED\_WIDTH]}, \texttt{C\_filt})
     \item Full-frame buffering (entire image stored in on-chip memory)
 \end{itemize}
 
@@ -336,17 +337,17 @@ static hls::stream<uint512_t> stream_filt("s_filt");
         \toprule[1.5pt]
         \textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{V1}} & \textbf{\textcolor{myblue}{V2}} & \textbf{\textcolor{myblue}{V3}} \\
         \midrule[0.8pt]
-        Target Clock Period & 10.00 ns & 10.00 ns & 10.00 ns \\
-        Estimated Clock & \textbf{XX.XX ns} & \textbf{XX.XX ns} & \textbf{XX.XX ns} \\
-        \rowcolor{lightbluegray!55} Latency (cycles) & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
-        Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        Target Clock Period (ns) & 10.00 & 10.00 & 10.00 \\
+        Estimated Clock (ns) & \textbf{7.30} & \textbf{7.30} & \textbf{7.30} \\
+        \rowcolor{lightbluegray!55} Latency (cycles) & \textbf{67632} & \textbf{3104} & \textbf{1048} \\
+        Execution Time ($\mu$s) & \textbf{676.32} & \textbf{31.04} & \textbf{10.48} \\
         \midrule[0.8pt]
         \multicolumn{4}{c}{\textbf{Resource Utilization}} \\
         \midrule[0.8pt]
-        DSP48E & \textbf{X} & \textbf{X} & \textbf{X} \\
-        \rowcolor{lightbluegray!55} BRAM & \textbf{X} & \textbf{X} & \textbf{X} \\
-        Flip-Flops (FF) & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
-        \rowcolor{lightbluegray!55} LUTs & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
+        DSP48E & \textbf{18} & \textbf{0} & \textbf{0} \\
+        \rowcolor{lightbluegray!55} BRAM\_18K & \textbf{256} & \textbf{30} & \textbf{0} \\
+        Flip-Flops (FF) & \textbf{21841} & \textbf{19876} & \textbf{22975} \\
+        \rowcolor{lightbluegray!55} LUTs & \textbf{54593} & \textbf{38816} & \textbf{40869} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
@@ -392,10 +393,10 @@ The following results are obtained from running the accelerator on actual FPGA h
         \midrule[0.8pt]
         Kernel Name & IMAGE\_DIFF & IMAGE\_DIFF & IMAGE\_DIFF \\
         \rowcolor{lightbluegray!55} Compute Units & 1 & 1 & 1 \\
-        Total Enqueues & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
-        \rowcolor{lightbluegray!55} Avg Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
-        Min Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
-        \rowcolor{lightbluegray!55} Max Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        Total Enqueues & \textbf{XXX} & \textbf{XXX} & \textbf{1} \\
+        \rowcolor{lightbluegray!55} Avg Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{17} \\
+        Min Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{17} \\
+        \rowcolor{lightbluegray!55} Max Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{17} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
@@ -415,10 +416,10 @@ The following results are obtained from running the accelerator on actual FPGA h
         \toprule[1.5pt]
         \textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{V1}} & \textbf{\textcolor{myblue}{V2}} & \textbf{\textcolor{myblue}{V3}} \\
         \midrule[0.8pt]
-        Total Transfers & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
-        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{XXXX.XX} \\
-        Avg Transfer Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
-        \rowcolor{lightbluegray!55} Link Utilization (\%) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
+        Total Transfers & \textbf{XXX} & \textbf{XXX} & \textbf{64} \\
+        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{8868.2} \\
+        Avg Transfer Size (Bytes) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{1024} \\
+        \rowcolor{lightbluegray!55} Link Utilization (\%) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{25} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
@@ -440,15 +441,15 @@ The following results are obtained from running the accelerator on actual FPGA h
         \midrule[0.8pt]
         \multicolumn{4}{c}{\textbf{Host to Device}} \\
         \midrule[0.8pt]
-        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
-        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{XXXX.XX} \\
-        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
+        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{1} \\
+        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{3.153} \\
+        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{131.072} \\
         \midrule[0.8pt]
         \multicolumn{4}{c}{\textbf{Device to Host}} \\
         \midrule[0.8pt]
-        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
-        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{XXXX.XX} \\
-        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
+        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{1} \\
+        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{1.422} \\
+        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{65.536} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
@@ -477,7 +478,7 @@ The following results are obtained from running the accelerator on actual FPGA h
         \midrule[0.8pt]
         HLS Latency (cycles) & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
         \rowcolor{lightbluegray!55} FPGA Exec Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
-        BRAM Usage & High & Medium & Low \\
+        BRAM Usage & Low & Medium & Low \\
         \rowcolor{lightbluegray!55} Implementation Complexity & Simple & Medium & High \\
         \bottomrule[1.5pt]
     \end{tabular}

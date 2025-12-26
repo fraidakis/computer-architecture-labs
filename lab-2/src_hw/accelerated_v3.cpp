@@ -24,15 +24,16 @@ static void compute_diff_wide(
    const uint512_t *B,
    hls::stream<uint512_t> &out_stream)
 {
+   uint512_t valA, valB, valC;
+
 Loop_Diff_Wide:
    for (int i = 0; i < TOTAL_CHUNKS; i++)
    {
 #pragma HLS PIPELINE II = 1
 #pragma HLS LOOP_TRIPCOUNT min = TOTAL_CHUNKS max = TOTAL_CHUNKS
 
-       uint512_t valA = A[i];
-       uint512_t valB = B[i];
-       uint512_t valC = 0;
+       valA = A[i];
+       valB = B[i];
    // Unroll to generate 64 parallel difference units
    Process_64_Pixels:
        for (int k = 0; k < PIXELS_PER_CHUNK; k++)
@@ -46,6 +47,7 @@ Loop_Diff_Wide:
            pixel_t diff = (pA > pB) ? (pA - pB) : (pB - pA);
            valC.range(hi, lo) = posterize(diff);
        }
+       
        out_stream.write(valC);
    }
 }
@@ -92,7 +94,7 @@ Loop_Filter_Wide:
 #pragma HLS PIPELINE II = 1
 
       // 1. Shift Window & Read New Data
-      uint512_t new_chunk = 0;
+      uint512_t new_chunk;
       if (iter < TOTAL_CHUNKS)
       {
           new_chunk = in_stream.read();
@@ -119,12 +121,6 @@ Loop_Filter_Wide:
           lb[0][col_idx] = lb[1][col_idx];
           lb[1][col_idx] = new_chunk;
       }
-      else
-      {
-          win[0][2] = 0;
-          win[1][2] = 0;
-          win[2][2] = 0;
-      }
 
       // 2. Compute Output for Center Chunk (win[1][1])
       int out_idx = iter - (CHUNKS_PER_ROW + 1);
@@ -134,7 +130,7 @@ Loop_Filter_Wide:
           int r_idx = out_idx / CHUNKS_PER_ROW; // Row index 0..255
           int c_chk = out_idx % CHUNKS_PER_ROW; // Chunk col index 0..3
 
-          uint512_t result_chunk = 0;
+          uint512_t result_chunk;
 
           // Border flags for cleaner logic
           const bool row_border = (r_idx == 0) || (r_idx == HEIGHT - 1);
