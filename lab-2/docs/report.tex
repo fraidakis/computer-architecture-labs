@@ -1,0 +1,514 @@
+\documentclass[12pt,a4paper]{article}
+
+% Essential packages
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\usepackage{titling}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{placeins}
+
+% Additional packages for beautification
+\usepackage[skins,breakable]{tcolorbox}
+\usepackage{fontspec}
+\usepackage{booktabs}
+\usepackage{mdframed}
+\usepackage{caption}
+\usepackage{soul}
+\usepackage{verbatim}
+
+\usepackage{array}
+\setlength{\tabcolsep}{6pt}
+
+% Color definitions
+\definecolor{titleblue}{RGB}{0,76,151}
+\definecolor{myblue}{RGB}{25,25,112}
+\definecolor{lightbluegray}{RGB}{220,230,245}  
+\definecolor{mygreen}{RGB}{0,128,0}
+\definecolor{mygray}{RGB}{245,245,245}
+\definecolor{myorange}{RGB}{230,126,34}
+
+% Custom tcolorbox styles
+\tcbset{
+    mybox/.style={
+        enhanced,
+        colback=myblue!3,
+        colframe=myblue,
+        arc=2mm,
+        boxrule=0.8pt
+    }
+}
+
+\newtcolorbox{mytitledbox}[1]{
+    enhanced,
+    colback=myblue!3,
+    colframe=titleblue!50,
+    arc=2mm,
+    boxrule=1.1pt,
+    title={\textcolor{white}{\textbf{#1}}},
+    coltitle=white,
+    fonttitle=\bfseries,
+    colbacktitle=titleblue!50
+}
+
+\newtcolorbox{solutionbox}{
+    enhanced,
+    colback=lightbluegray!80,  
+    colframe=titleblue!50,     
+    arc=1.5mm,                
+    boxrule=0.15pt,            
+    top=2mm,                 
+    bottom=2mm,
+    before=\vspace{2mm},
+    after=\vspace{2mm},     
+    breakable
+}
+
+\newtcolorbox{versionbox}[1]{
+    enhanced,
+    colback=myorange!5,
+    colframe=myorange!70,
+    arc=2mm,
+    boxrule=0.8pt,
+    title={\textcolor{white}{\textbf{#1}}},
+    coltitle=white,
+    fonttitle=\bfseries,
+    colbacktitle=myorange!70
+}
+
+% Header and footer setup
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.8pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\fancyhead[L]{\textsf{\textcolor{myblue}{Computer Architecture Laboratory}}}
+\fancyhead[R]{\textsf{\textcolor{myblue}{Lab 2 Report}}}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14.5pt}
+\addtolength{\topmargin}{-2.5pt}
+
+% Custom section styling
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{myblue}}
+  {\thesection}{1em}{}[\titlerule]
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{myblue}}
+  {\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries\color{myblue}}
+  {\thesubsubsection}{1em}{}
+
+% Listing style for code
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{mygray},
+    commentstyle=\color{mygreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{gray},
+    stringstyle=\color{purple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    framesep=5pt,
+    framerule=0.5pt,
+    framexleftmargin=6pt,
+    framexrightmargin=6pt,
+    framextopmargin=4pt,
+    framexbottommargin=4pt,
+}
+\lstset{style=mystyle}
+
+% ==========================================
+% TITLE PAGE
+% ==========================================
+
+\title{
+    \vspace*{2cm}
+    \Huge\textbf{\textsf{Computer Architecture Report}}\\
+    \vspace{0.4cm}
+    \Large\textsf{Lab 2: Image Processing Accelerator with Sharpening Filter}
+    \vspace{1cm}
+    \rule{\textwidth}{1pt}
+}
+
+\author{
+    \Large\begin{tabular}{rl}
+        \textbf{Fraidakis Ioannis}\\
+    \end{tabular}
+}
+\date{\Large\textsf{December 2025}}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+\begin{tcolorbox}[mybox]
+This laboratory exercise extends the previous lab by adding a 3×3 sharpening filter to the image processing pipeline. The accelerator now performs three operations in sequence:
+\begin{enumerate}
+    \item \textbf{Absolute Difference}: $D[i][j] = |A[i][j] - B[i][j]|$
+    \item \textbf{Posterization}: Map $D$ to discrete levels (0, 128, or 255)
+    \item \textbf{Sharpen Filter}: Apply a Laplacian-based 3×3 convolution kernel
+\end{enumerate}
+The lab explores three different architectural implementations (V1, V2, V3) to optimize throughput and resource utilization, analyzing trade-offs between memory access patterns, dataflow parallelism, and hardware complexity.
+\end{tcolorbox}
+
+\section{Algorithm Description}
+
+\subsection{Processing Pipeline}
+
+The image processing pipeline consists of three stages:
+
+\begin{enumerate}
+    \item \textbf{Difference Calculation:} For each pixel $(i, j)$:
+    $$D[i][j] = |A[i][j] - B[i][j]|$$
+    
+    \item \textbf{Posterization Thresholding:} 
+    $$
+    P[i][j] = 
+    \begin{cases} 
+    0 & \text{if } D < 32 \quad (\text{Black}) \\
+    128 & \text{if } 32 \le D < 96 \quad (\text{Gray}) \\
+    255 & \text{if } D \ge 96 \quad (\text{White})
+    \end{cases}
+    $$
+    
+    \item \textbf{Sharpen Filter:} Apply Laplacian-based 3×3 kernel:
+    $$
+    K = \begin{bmatrix}
+    0 & -1 & 0 \\
+    -1 & 5 & -1 \\
+    0 & -1 & 0
+    \end{bmatrix}
+    $$
+    Output: $C[i][j] = \text{clip}(5 \cdot P[i][j] - P[i-1][j] - P[i+1][j] - P[i][j-1] - P[i][j+1])$
+\end{enumerate}
+
+\subsection{Memory Interface}
+
+All implementations use 512-bit wide AXI master interfaces (64 pixels per memory transaction). This aligns with the DDR memory bus width and maximizes memory bandwidth utilization.
+
+\newpage
+
+\section{Implementation Versions}
+
+This section describes the three accelerator implementations and their architectural differences.
+
+\begin{versionbox}{Version 1: Sequential Three-Stage Pipeline}
+\textbf{File:} \texttt{accelerated\_v1.cpp}
+
+\textbf{Architecture Overview:}
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=1mm]
+    \item Three sequential stages that execute one after another
+    \item Uses 2D local BRAM buffers (\texttt{C\_tmp[HEIGHT][PADDED\_STRIDE]}, \texttt{C\_filt})
+    \item Full-frame buffering (entire image stored in on-chip memory)
+\end{itemize}
+
+\textbf{Stage Execution:}
+\begin{enumerate}
+    \item \textbf{Stage 1 (Posterize):} Read 512-bit chunks from A/B, compute difference, posterize, store to \texttt{C\_tmp}
+    \item \textbf{Stage 2 (Filter):} Row-by-row filtering with direct 2D array access
+    \item \textbf{Stage 3 (Pack):} Read from \texttt{C\_filt}, pack into 512-bit words, write to DDR
+\end{enumerate}
+
+\textbf{Key Optimizations:}
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=1mm]
+    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=C\_tmp cyclic factor=3 dim=1} - Enables parallel access to north/center/south rows
+    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=C\_tmp cyclic factor=64 dim=2} - Enables 64-pixel parallel access
+    \item \texttt{\#pragma HLS PIPELINE II=1} on all major loops
+    \item \texttt{\#pragma HLS UNROLL} for inner 64-pixel processing
+\end{itemize}
+
+\textbf{Trade-offs:}
+\begin{itemize}
+    \item[$+$] Simple to implement and debug
+    \item[$+$] 2D indexing simplifies filter neighbor access
+    \item[$-$] Requires substantial BRAM for full-frame buffering
+    \item[$-$] Stages execute sequentially (no overlap)
+\end{itemize}
+\end{versionbox}
+
+\newpage
+
+\begin{versionbox}{Version 2: Sequential with Line Buffers}
+\textbf{File:} \texttt{accelerated\_v2.cpp}
+
+\textbf{Architecture Overview:}
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=1mm]
+    \item Three sequential stages (same as V1) but with optimized filter stage
+    \item Uses 512-bit chunk-based intermediate buffers (\texttt{uint512\_t C\_tmp[TOTAL\_CHUNKS]})
+    \item Filter stage uses line buffers and sliding window for memory efficiency
+\end{itemize}
+
+\textbf{Filter Stage Implementation:}
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=1mm]
+    \item \textbf{Line Buffers:} \texttt{uint512\_t lb[2][CHUNKS\_PER\_ROW]} - Stores 2 rows of 512-bit chunks
+    \item \textbf{Sliding Window:} \texttt{uint512\_t win[3][3]} - 3×3 grid of chunks for convolution
+    \item Extended loop with pipeline drain: \texttt{TOTAL\_CHUNKS + CHUNKS\_PER\_ROW + 1} iterations
+\end{itemize}
+
+\textbf{West/East Neighbor Access:}
+Handles chunk boundaries explicitly:
+\begin{itemize}
+    \item West neighbor at $k=0$: Access \texttt{win[1][0].range(511, 504)} (last byte of left chunk)
+    \item East neighbor at $k=63$: Access \texttt{win[1][2].range(7, 0)} (first byte of right chunk)
+\end{itemize}
+
+\textbf{Trade-offs:}
+\begin{itemize}
+    \item[$+$] More memory-efficient filter implementation using line buffers
+    \item[$+$] Maintains 512-bit data format throughout (no unpack/repack overhead)
+    \item[$-$] Complex sliding window logic with chunk boundary handling
+    \item[$-$] Still sequential execution (no stage overlap)
+\end{itemize}
+\end{versionbox}
+
+\newpage
+
+\begin{versionbox}{Version 3: Dataflow Streaming Architecture (Ultra-Optimized)}
+\textbf{File:} \texttt{accelerated\_v3.cpp}
+
+\textbf{Architecture Overview:}
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=1mm]
+    \item \textbf{True dataflow} with \texttt{\#pragma HLS DATAFLOW}
+    \item Three concurrent stages connected via \texttt{hls::stream<uint512\_t>}
+    \item Pipeline parallelism: all stages execute simultaneously on different data chunks
+\end{itemize}
+
+\textbf{Stage Functions:}
+\begin{enumerate}
+    \item \texttt{compute\_diff\_wide()}: Reads A/B, computes posterized difference, writes to \texttt{stream\_post}
+    \item \texttt{apply\_filter\_wide()}: Reads from \texttt{stream\_post}, applies sharpen filter using line buffers/sliding window, writes to \texttt{stream\_filt}
+    \item \texttt{write\_result\_wide()}: Reads from \texttt{stream\_filt}, writes to output memory C
+\end{enumerate}
+
+\textbf{Stream Configuration:}
+\begin{lstlisting}[language=C++]
+static hls::stream<uint512_t> stream_post("s_post");
+static hls::stream<uint512_t> stream_filt("s_filt");
+#pragma HLS STREAM variable=stream_post depth=16
+#pragma HLS STREAM variable=stream_filt depth=16
+\end{lstlisting}
+
+\textbf{Expected Performance:}
+\begin{itemize}
+    \item \textbf{Throughput:} 64 pixels per clock cycle
+    \item \textbf{Latency:} $\sim$1,050 cycles (theoretical minimum for 256×256 is 1024 cycles)
+\end{itemize}
+
+\textbf{Trade-offs:}
+\begin{itemize}
+    \item[$+$] Highest throughput due to overlapped stage execution
+    \item[$+$] Minimal latency (close to theoretical minimum)
+    \item[$+$] Memory-efficient streaming (no full-frame buffering)
+    \item[$-$] Most complex implementation
+    \item[$-$] Requires careful stream depth tuning to avoid deadlock
+\end{itemize}
+\end{versionbox}
+
+\newpage
+
+\section{HLS Synthesis Results}
+
+\begin{mytitledbox}{Vitis HLS Synthesis Comparison (256×256 Image)}
+
+\begin{table}[H]
+    \centering
+    \caption{Latency and resource utilization comparison across versions.}
+    \label{tab:hls_comparison}
+    
+    \begin{tabular}{@{}l c c c@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{V1}} & \textbf{\textcolor{myblue}{V2}} & \textbf{\textcolor{myblue}{V3}} \\
+        \midrule[0.8pt]
+        Target Clock Period & 10.00 ns & 10.00 ns & 10.00 ns \\
+        Estimated Clock & \textbf{XX.XX ns} & \textbf{XX.XX ns} & \textbf{XX.XX ns} \\
+        \rowcolor{lightbluegray!55} Latency (cycles) & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
+        Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        \midrule[0.8pt]
+        \multicolumn{4}{c}{\textbf{Resource Utilization}} \\
+        \midrule[0.8pt]
+        DSP48E & \textbf{X} & \textbf{X} & \textbf{X} \\
+        \rowcolor{lightbluegray!55} BRAM & \textbf{X} & \textbf{X} & \textbf{X} \\
+        Flip-Flops (FF) & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
+        \rowcolor{lightbluegray!55} LUTs & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\end{mytitledbox}
+
+\subsection{Analysis}
+
+\begin{solutionbox}
+\textbf{Performance Analysis:}
+\begin{itemize}
+    \item \textbf{V1} uses full-frame 2D buffers with array partitioning for parallel access. The filter stage iterates row-by-row with direct neighbor access.
+    \item \textbf{V2} optimizes memory storage by keeping data in 512-bit format but uses sequential stage execution.
+    \item \textbf{V3} achieves the lowest latency through dataflow parallelism, allowing all three stages to execute concurrently on different data chunks.
+\end{itemize}
+
+\textbf{Resource Trade-offs:}
+\begin{itemize}
+    \item V1 and V2 require more BRAM for intermediate storage
+    \item V3 uses streams with depth=16, minimizing buffering requirements
+    \item All versions unroll the 64-pixel inner loop, resulting in similar LUT usage for the compute datapath
+\end{itemize}
+\end{solutionbox}
+
+\newpage
+
+\section{Vitis IDE Execution Results}
+
+The following results are obtained from running the accelerator on actual FPGA hardware using Vitis IDE.
+
+\subsection{Kernel Execution Statistics}
+
+\begin{mytitledbox}{Kernels \& Compute Units $\rightarrow$ Kernel Execution}
+
+\begin{table}[H]
+    \centering
+    \caption{Kernel execution metrics from Vitis IDE.}
+    \label{tab:kernel_exec}
+    
+    \begin{tabular}{@{}l c c c@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{V1}} & \textbf{\textcolor{myblue}{V2}} & \textbf{\textcolor{myblue}{V3}} \\
+        \midrule[0.8pt]
+        Kernel Name & IMAGE\_DIFF & IMAGE\_DIFF & IMAGE\_DIFF \\
+        \rowcolor{lightbluegray!55} Compute Units & 1 & 1 & 1 \\
+        Total Enqueues & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
+        \rowcolor{lightbluegray!55} Avg Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        Min Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        \rowcolor{lightbluegray!55} Max Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\end{mytitledbox}
+
+\subsection{Kernel Data Transfers}
+
+\begin{mytitledbox}{Kernel Data Transfers $\rightarrow$ Top Kernel Data Transfer}
+
+\begin{table}[H]
+    \centering
+    \caption{Top kernel data transfer statistics.}
+    \label{tab:kernel_transfers}
+    
+    \begin{tabular}{@{}l c c c@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{V1}} & \textbf{\textcolor{myblue}{V2}} & \textbf{\textcolor{myblue}{V3}} \\
+        \midrule[0.8pt]
+        Total Transfers & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
+        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{XXXX.XX} \\
+        Avg Transfer Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
+        \rowcolor{lightbluegray!55} Link Utilization (\%) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\end{mytitledbox}
+
+\subsection{Host Data Transfers}
+
+\begin{mytitledbox}{Host Data Transfer $\rightarrow$ Host Transfer}
+
+\begin{table}[H]
+    \centering
+    \caption{Host-to-device and device-to-host transfer statistics.}
+    \label{tab:host_transfers}
+    
+    \begin{tabular}{@{}l c c c@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Metric}} & \textbf{\textcolor{myblue}{V1}} & \textbf{\textcolor{myblue}{V2}} & \textbf{\textcolor{myblue}{V3}} \\
+        \midrule[0.8pt]
+        \multicolumn{4}{c}{\textbf{Host to Device}} \\
+        \midrule[0.8pt]
+        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
+        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{XXXX.XX} \\
+        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
+        \midrule[0.8pt]
+        \multicolumn{4}{c}{\textbf{Device to Host}} \\
+        \midrule[0.8pt]
+        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{XXX} \\
+        \rowcolor{lightbluegray!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{XXXX.XX} \\
+        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{XX.XX} \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\end{mytitledbox}
+
+\newpage
+
+\section{Performance Comparison Summary}
+
+\begin{mytitledbox}{Overall Performance Comparison}
+
+\begin{table}[H]
+    \centering
+    \caption{Summary comparison of all three implementations.}
+    \label{tab:summary}
+    
+    \begin{tabular}{@{}p{0.35\textwidth} c c c@{}}
+        \toprule[1.5pt]
+        \textbf{\textcolor{myblue}{Characteristic}} & \textbf{\textcolor{myblue}{V1}} & \textbf{\textcolor{myblue}{V2}} & \textbf{\textcolor{myblue}{V3}} \\
+        \midrule[0.8pt]
+        Architecture & Sequential & Sequential & Dataflow \\
+        \rowcolor{lightbluegray!55} Buffer Type & 2D Arrays & 512-bit Chunks & Streams \\
+        Filter Implementation & Direct 2D & Line Buffer & Line Buffer \\
+        \rowcolor{lightbluegray!55} Stage Parallelism & None & None & Full Overlap \\
+        \midrule[0.8pt]
+        HLS Latency (cycles) & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
+        \rowcolor{lightbluegray!55} FPGA Exec Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        BRAM Usage & High & Medium & Low \\
+        \rowcolor{lightbluegray!55} Implementation Complexity & Simple & Medium & High \\
+        \bottomrule[1.5pt]
+    \end{tabular}
+\end{table}
+
+\end{mytitledbox}
+
+\subsection{Speed-up Calculation}
+
+\begin{solutionbox}
+\textbf{V3 vs V1 Speed-up:}
+$$ \text{Speedup} = \frac{\text{Latency}_{V1}}{\text{Latency}_{V3}} = \frac{XXXXX}{XXXXX} \approx \mathbf{X.XX \times} $$
+
+\textbf{V3 vs V2 Speed-up:}
+$$ \text{Speedup} = \frac{\text{Latency}_{V2}}{\text{Latency}_{V3}} = \frac{XXXXX}{XXXXX} \approx \mathbf{X.XX \times} $$
+\end{solutionbox}
+
+\section{Conclusion}
+
+\begin{tcolorbox}[mybox]
+This laboratory exercise explored three architectural approaches for implementing an image processing accelerator with difference, posterization, and sharpening operations:
+
+\begin{itemize}[label=\textcolor{myblue}{$\blacktriangleright$}, itemsep=2mm]
+    \item \textbf{V1 (Sequential + 2D Buffers):} Simplest implementation with straightforward 2D array access for the filter stage. Trades off memory for simplicity.
+    
+    \item \textbf{V2 (Sequential + Line Buffers):} More memory-efficient filter implementation using sliding window on 512-bit chunks, but still sequential execution.
+    
+    \item \textbf{V3 (Dataflow + Streams):} Achieves maximum performance through pipeline parallelism with HLS streams. All stages execute concurrently, approaching theoretical minimum latency.
+\end{itemize}
+
+The results demonstrate the trade-offs between implementation complexity, resource utilization, and performance. The dataflow architecture (V3) provides the best performance but requires careful design of stream depths and stage balancing.
+\end{tcolorbox}
+
+\end{document}
