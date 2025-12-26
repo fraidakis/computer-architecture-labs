@@ -18,7 +18,7 @@
  *   3) Pack C_filt into 512-bit words -> write C
  */
 
-#include "../../inc/image_defines.h"
+#include "../inc/image_defines.h"
 
 // Number of 512-bit chunks (for non-padded layout)
 #define CHUNK_COUNT (IMAGE_SIZE / PIXELS_PER_CHUNK)
