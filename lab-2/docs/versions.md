@@ -6,7 +6,6 @@ This document compares the evolution of the HLS image processing kernel from bas
 
 | Version | Architecture | Data Storage | Filter Strategy | Key Feature |
 |---------|-------------|--------------|-----------------|-------------|
-| **Baseline** | Pure C/C++ | 1D flat arrays | Nested loops | Reference implementation |
 | **V1** | Sequential 3-stage | 2D BRAM arrays | Pixel-by-pixel | Array partitioning |
 | **V2** | Sequential 3-stage | 512-bit chunk arrays | Line buffers + sliding window | 64 px/cycle in filter |
 | **V3** | **Dataflow pipeline** | **HLS streams** | Line buffers + sliding window | Overlapped execution |
@@ -15,33 +14,7 @@ This document compares the evolution of the HLS image processing kernel from bas
 
 ## Version Evolution
 
-### Baseline - Pure Software Reference
-[image_diff_baseline.cpp](file:///c:/computer-architecture/computer-architecture-labs/lab-2/VITIS_HLS/image_diff_baseline.cpp)
-
-**Architecture**: Pure C implementation without HLS pragmas.
-
-```cpp
-static pixel_t temp_P[IMAGE_SIZE];  // 1D flat buffer
-
-// Stage 1: Difference & Posterize
-for (int i = 0; i < IMAGE_SIZE; i++) { ... }
-
-// Stage 2: 3x3 Sharpen Filter
-for (int i = 0; i < HEIGHT; i++) {
-    for (int j = 0; j < WIDTH; j++) { ... }
-}
-```
-
-**Key Characteristics**:
-- Standard `pixel_t` function signature (no `uint512_t`)
-- 1D linear indexing: `i * WIDTH + j`
-- No HLS pragmas — purely for functional validation
-- **Purpose**: Golden reference for testbench comparison
-
----
-
 ### V1 - Array Partitioning
-[accelerated_v1.cpp](file:///c:/computer-architecture/computer-architecture-labs/lab-2/VITIS_HLS/accelerated_v1.cpp)
 
 **Architecture**: 2D BRAM arrays with **cyclic partitioning** for parallel access.
 
@@ -54,14 +27,6 @@ static pixel_t C_filt[HEIGHT][PADDED_WIDTH];
 #pragma HLS ARRAY_PARTITION variable=C_filt cyclic factor=64 dim=2
 ```
 
-**Improvements over Baseline**:
-| Aspect | Baseline | V1 |
-|--------|----------|----|
-| Data type | `pixel_t[]` | `uint512_t*` (AXI) |
-| Buffer layout | 1D flat | 2D `[HEIGHT][PADDED_WIDTH]` |
-| Parallel access | None | 64 pixels + 3 rows |
-| Pipelining | None | `#pragma HLS PIPELINE II=1` |
-
 **Stages**:
 1. **Posterize**: Unpack 512-bit → 64 pixels → posterize → store to 2D array
 2. **Filter**: Pixel-by-pixel with II=1 pipelining
@@ -70,7 +35,6 @@ static pixel_t C_filt[HEIGHT][PADDED_WIDTH];
 ---
 
 ### V2 - Line Buffer + Sliding Window
-[accelerated_v2.cpp](file:///c:/computer-architecture/computer-architecture-labs/lab-2/VITIS_HLS/accelerated_v2.cpp)
 
 **Architecture**: Operates directly on **512-bit chunks** with line buffers.
 
@@ -119,7 +83,6 @@ else        val -= win[1][2].range(7, 0);     // From right chunk
 ---
 
 ### V3 - Dataflow Streaming
-[accelerated_v3.cpp](file:///c:/computer-architecture/computer-architecture-labs/lab-2/VITIS_HLS/accelerated_v3.cpp)
 
 **Architecture**: **Full dataflow pipeline** with HLS streams connecting modular stages.
 
@@ -159,23 +122,11 @@ write_result_wide(stream_filt, C);
 
 ## Optimization Summary
 
-```mermaid
-graph LR
-    BL["Baseline<br/>Pure C/C++<br/>No pragmas"] --> V1["V1<br/>Array partitioning<br/>2D pixel buffers"]
-    V1 --> V2["V2<br/>512-bit chunks<br/>Line buffers"]
-    V2 --> V3["V3<br/>HLS Dataflow<br/>Streaming"]
-    
-    style BL fill:#f0f0f0
-    style V1 fill:#ffcccc
-    style V2 fill:#ffe6cc
-    style V3 fill:#ccffcc
-```
-
-| Optimization | BL→V1 | V1→V2 | V2→V3 |
-|--------------|-------|-------|-------|
-| **Goal** | HLS synthesis | Chunk-level parallelism | Overlap stages |
-| **Technique** | Array partitioning | Line buffers + sliding window | Dataflow + streams |
-| **Filter throughput** | 1 px/cycle | 64 px/cycle | 64 px/cycle (concurrent) |
+| Optimization | V1→V2 | V2→V3 |
+|--------------|-------|-------|
+| **Goal** | Chunk-level parallelism | Overlap stages |
+| **Technique** | Line buffers + sliding window | Dataflow + streams |
+| **Filter throughput** | 64 px/cycle | 64 px/cycle (concurrent) |
 
 ---
 
