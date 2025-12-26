@@ -13,9 +13,9 @@ typedef uint8_t pixel_t;
 #define IMAGE_SIZE (HEIGHT * WIDTH)
 
 // Data width and pixel size for memory calculations
-#define DATA_WIDTH_BITS     512                                 // Width of memory bus in bits
-#define PIXEL_SIZE_BITS     8                                   // Size of each pixel in bits
-#define PIXELS_PER_CHUNK    (DATA_WIDTH_BITS / PIXEL_SIZE_BITS) // 512/8 = 64 pixels per chunk
+#define DATA_WIDTH_BITS  512                                 // Width of memory bus in bits
+#define PIXEL_SIZE_BITS  (sizeof(pixel_t) * 8)               // Size of each pixel in bits
+#define PIXELS_PER_CHUNK (DATA_WIDTH_BITS / PIXEL_SIZE_BITS) // 512/8 = 64 pixels per chunk
 
 // Calculate padded width for memory allocation
 // Number of 512-bit chunks per row
