@@ -89,7 +89,7 @@
     colbacktitle=primaryBlue,
     attach boxed title to top left={yshift=-2mm, xshift=4mm},
     boxed title style={arc=2mm, boxrule=0pt},
-    top=6mm,
+    top=3mm,
     drop shadow={shadow xshift=0.5mm, shadow yshift=-0.5mm, opacity=0.12}
 }
 
@@ -289,7 +289,7 @@ colbacktitle=purpleAccent,
 \end{enumerate}
 
 \vspace{2mm}
-\textcolor{textMuted}{\faInfoCircle}\hspace{2mm}\textit{Additionally, three different architectural implementations (V1, V2, V3) were developed to explore optimization strategies for throughput and resource utilization, analyzing trade-offs between memory access patterns, dataflow parallelism, and hardware complexity. These versions were not part of the lab requirements but were implemented as a personal exploration of HLS design techniques.}
+\textcolor{textMuted}{\faInfoCircle}\hspace{2mm}\textit{Additionally, three different architectural implementations (V1, V2, V3) were developed to explore optimization strategies for throughput and resource utilization, analyzing trade-offs between memory access patterns and dataflow parallelism.}
 \end{tcolorbox}
 
 \section{Algorithm Description}
@@ -328,41 +328,53 @@ The image processing pipeline consists of three stages:
 
 \subsection{Memory Interface}
 
-All implementations use 512-bit wide AXI master interfaces (64 pixels per memory transaction). This aligns with the DDR memory bus width and maximizes memory bandwidth utilization.
+All implementations use 512-bit wide AXI master interfaces (64 pixels per memory transaction). This aligns with the DDR memory bus width and maximizes memory bandwidth utilization, enabling efficient burst transfers to and from global memory.
 
 \section{Implementation Versions}
 
-This section describes the three accelerator implementations and their architectural differences.
+\vspace{2mm}
+This section describes the three accelerator implementations and architectural differences.
+% \vspace{1mm}
 
 \begin{versionbox}{Version 1: Sequential Three-Stage Pipeline}
-\textbf{\faFile*[regular]\hspace{2mm}File:} \texttt{accelerated\_v1.cpp}
+\textbf{\faFile*[regular]\hspace{2mm}File:} \texttt{src\_hw/accelerated\_v1.cpp}
+
+\vspace{4mm}
 
 \textbf{\faCubes\hspace{2mm}Architecture Overview:}
 \begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, itemsep=1.5mm, leftmargin=5mm]
     \item Three sequential stages that execute one after another
     \item Uses 2D local BRAM buffers (\texttt{C\_tmp[HEIGHT][PADDED\_WIDTH]}, \texttt{C\_filt})
     \item Full-frame buffering (entire image stored in on-chip memory)
+    % \item Separate AXI bundles (\texttt{gmemA}, \texttt{gmemB}, \texttt{gmemC}) enable concurrent DDR access
 \end{itemize}
 
 \textbf{\faLayerGroup\hspace{2mm}Stage Execution:}
 \begin{enumerate}[label=\textcolor{warningOrange}{\arabic*.}, itemsep=1.5mm, leftmargin=6mm]
-    \item \textbf{Stage 1 (Posterize):} Read 512-bit chunks from A/B, compute difference, posterize, store to \texttt{C\_tmp}
-    \item \textbf{Stage 2 (Filter):} Row-by-row filtering with direct 2D array access
+    \item \textbf{Stage 1 (Posterize):} Read 512-bit chunks from A/B, compute absolute difference, apply posterization (3-level quantization), store results to \texttt{C\_tmp} buffer
+    \item \textbf{Stage 2 (Filter):} \underline{Pixel-by-pixel} filtering with direct 2D array access
     \item \textbf{Stage 3 (Pack):} Read from \texttt{C\_filt}, pack into 512-bit words, write to DDR
 \end{enumerate}
 
+\textbf{\faChartLine\hspace{2mm}Throughput Analysis:}
+\begin{itemize}[label=\textcolor{primaryBlue}{\faCircle[regular]}, itemsep=1mm, leftmargin=5mm]
+    \item \textbf{Stage 1 \& 3:} Process 64 pixels/cycle (limited by 512-bit memory interface)
+    \item \textbf{Stage 2:} Processes only 1 pixel/cycle  --- \textit{this is the performance bottleneck}
+    \item \textbf{Total Latency:} $\approx$ \texttt{TOTAL\_CHUNKS} + \texttt{HEIGHT} $\times$ \texttt{WIDTH} + \texttt{TOTAL\_CHUNKS} cycles
+\end{itemize}
+
 \textbf{\faCogs\hspace{2mm}Key Optimizations:}
 \begin{itemize}[itemsep=1.5mm, leftmargin=5mm]
-    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=C\_tmp cyclic factor=3 dim=1}\\ {\small\textcolor{textMuted}{Enables parallel access to north/center/south rows}}
-    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=C\_tmp cyclic factor=64 dim=2}\\ {\small\textcolor{textMuted}{Enables 64-pixel parallel access}}
+    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=C\_tmp cyclic factor=3 dim=1}\\ {\small\textcolor{textMuted}{Enables parallel access to north/center/south rows in Filter stage}}
+    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=C\_tmp cyclic factor=64 dim=2}\\ {\small\textcolor{textMuted}{Enables 64-pixel parallel access in Posterize stage}}
     \item \texttt{\#pragma HLS PIPELINE II=1} on all major loops
     \item \texttt{\#pragma HLS UNROLL} for inner 64-pixel processing
 \end{itemize}
 
 \textbf{\faBalanceScale\hspace{2mm}Trade-offs:}
 \begin{itemize}[leftmargin=5mm, itemsep=1mm]
-    \item[\textcolor{successGreen}{\faCheckCircle}] Simple to implement and debug
-    \item[\textcolor{successGreen}{\faCheckCircle}] 2D indexing simplifies filter neighbor access
+    \item[\textcolor{successGreen}{\faCheckCircle}] Simple to implement and debug --- good starting point and reference baseline
+    \item[\textcolor{successGreen}{\faCheckCircle}] Pixel-by-pixel filtering avoids line buffer complexity (unlike V2/V3)
     \item[\textcolor{dangerRed}{\faTimesCircle}] Requires substantial BRAM for full-frame buffering
     \item[\textcolor{dangerRed}{\faTimesCircle}] Stages execute sequentially (no overlap)
 \end{itemize}
@@ -371,42 +383,57 @@ This section describes the three accelerator implementations and their architect
 \newpage
 
 \begin{versionbox}{Version 2: Sequential with Line Buffers}
-\textbf{\faFile*[regular]\hspace{2mm}File:} \texttt{accelerated\_v2.cpp}
+\textbf{\faFile*[regular]\hspace{2mm}File:} \texttt{src\_hw/accelerated\_v2.cpp}
+
+\vspace{4mm}
 
 \textbf{\faCubes\hspace{2mm}Architecture Overview:}
-\begin{itemize}
+\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, itemsep=1.5mm, leftmargin=5mm]
     \item Three sequential stages (same as V1) but with optimized filter stage
-    \item Uses 512-bit chunk-based intermediate buffers (\texttt{uint512\_t C\_tmp[TOTAL\_CHUNKS]})
+    \item Uses 1D packed 512-bit chunk buffers (\texttt{uint512\_t C\_tmp[TOTAL\_CHUNKS]}) instead of V1's 2D pixel arrays
     \item Filter stage uses line buffers and sliding window for memory efficiency
 \end{itemize}
 
+\textbf{\faChartLine\hspace{2mm}Throughput Analysis:}
+\begin{itemize}[label=\textcolor{primaryBlue}{\faCircle[regular]}, itemsep=1mm, leftmargin=5mm]
+    \item \textbf{All Stages:} Process 64 pixels/cycle (II=1 for 512-bit chunks)
+    \item \textbf{Filter Latency:} Extended loop (\texttt{+CHUNKS\_PER\_ROW+1} iterations) to fill and drain the sliding window, due to convolution
+    \item \textbf{Key Improvement:} Eliminates the 1-pixel/cycle bottleneck from V1 filtering
+\end{itemize}
+
 \textbf{\faFilter\hspace{2mm}Filter Stage Implementation:}
-\begin{itemize}
-    \item \textbf{Line Buffers:} \texttt{uint512\_t lb[2][CHUNKS\_PER\_ROW]}\\ {\small\textcolor{textMuted}{Stores 2 rows of 512-bit chunks}}
-    \item \textbf{Sliding Window:} \texttt{uint512\_t win[3][3]}\\ {\small\textcolor{textMuted}{3×3 grid of chunks for convolution}}
-    \item Extended loop with pipeline drain: \texttt{TOTAL\_CHUNKS + CHUNKS\_PER\_ROW + 1} iterations
+\begin{itemize}[itemsep=1.5mm, leftmargin=5mm]
+    \item \textbf{Line Buffers:} \texttt{uint512\_t lb[2][CHUNKS\_PER\_ROW]}\\ {\small\textcolor{textMuted}{Stores 2 rows of 512-bit chunks for vertical neighbor access}}
+    \item \textbf{Sliding Window:} \texttt{uint512\_t win[3][3]}\\ {\small\textcolor{textMuted}{3$\times$3 grid of chunks --- center chunk \texttt{win[1][1]} contains pixels being filtered}}
 \end{itemize}
 
 \textbf{\faArrowsAltH\hspace{2mm}West/East Neighbor Access:}
 {\small Handles chunk boundaries explicitly:}
-\begin{itemize}
+\begin{itemize}[itemsep=1.5mm, leftmargin=5mm]
     \item West neighbor at $k=0$: Access \texttt{win[1][0].range(511, 504)}
     \item East neighbor at $k=63$: Access \texttt{win[1][2].range(7, 0)}
 \end{itemize}
 
+\textbf{\faCogs\hspace{2mm}Key Optimizations:}
+\begin{itemize}[itemsep=1.5mm, leftmargin=5mm]
+    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=lb complete dim=1}\\ {\small\textcolor{textMuted}{Both line buffer rows accessible in parallel}}
+    \item \texttt{\#pragma HLS ARRAY\_PARTITION variable=win complete dim=0}\\ {\small\textcolor{textMuted}{Entire 3$\times$3 sliding window accessible simultaneously}}
+    \item \texttt{\#pragma HLS PIPELINE II=1} on all major loops
+\end{itemize}
+
 \textbf{\faBalanceScale\hspace{2mm}Trade-offs:}
 \begin{itemize}[leftmargin=5mm, itemsep=1mm]
-    \item[\textcolor{successGreen}{\faCheckCircle}] More memory-efficient filter implementation using line buffers
-    \item[\textcolor{successGreen}{\faCheckCircle}] Maintains 512-bit data format throughout (no unpack/repack overhead)
+    \item[\textcolor{successGreen}{\faCheckCircle}] 64$\times$ faster filter stage compared to V1's pixel-by-pixel approach
+    \item[\textcolor{successGreen}{\faCheckCircle}] Less BRAM usage (no array partitioning needed unlike V1)
     \item[\textcolor{dangerRed}{\faTimesCircle}] Complex sliding window logic with chunk boundary handling
-    \item[\textcolor{dangerRed}{\faTimesCircle}] Still sequential execution (no stage overlap)
+    \item[\textcolor{dangerRed}{\faTimesCircle}] Still sequential execution (stages do not overlap)
 \end{itemize}
 \end{versionbox}
 
-\newpage
-
 \begin{versionbox}{Version 3: Dataflow Streaming Architecture (Ultra-Optimized)}
-\textbf{\faFile*[regular]\hspace{2mm}File:} \texttt{accelerated\_v3.cpp}
+\textbf{\faFile*[regular]\hspace{2mm}File:} \texttt{src\_hw/accelerated\_v3.cpp}
+
+\vspace{4mm}
 
 \textbf{\faCubes\hspace{2mm}Architecture Overview:}
 \begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, itemsep=1.5mm, leftmargin=5mm]
@@ -424,29 +451,32 @@ This section describes the three accelerator implementations and their architect
 
 \textbf{\faStream\hspace{2mm}Stream Configuration:}
 \begin{lstlisting}[language=C++]
-static hls::stream<uint512_t> stream_post("s_post");
-static hls::stream<uint512_t> stream_filt("s_filt");
+hls::stream<uint512_t> stream_post("s_post");
+hls::stream<uint512_t> stream_filt("s_filt");
 #pragma HLS STREAM variable=stream_post depth=16
 #pragma HLS STREAM variable=stream_filt depth=16
 \end{lstlisting}
 
-\textbf{\faTachometerAlt\hspace{2mm}Expected Performance:}
+\textbf{\faRocket\hspace{2mm}Expected Performance:}
 \begin{itemize}[itemsep=1.5mm, leftmargin=5mm]
     \item \textbf{Throughput:} 64 pixels per clock cycle
-    \item \textbf{Latency:} $\sim$1,050 cycles {\small\textcolor{textMuted}{(theoretical minimum for 256×256 is 1024 cycles)}}
+    \item \textbf{Latency:} Theoretical minimum of 1,024 cycles {\small\textcolor{textMuted}{($256 \times 256$ pixels $\div$ 64 pixels/cycle)}}
+\end{itemize}
+
+\textbf{\faCogs\hspace{2mm}Key Optimizations:}
+\begin{itemize}[itemsep=1.5mm, leftmargin=5mm]
+    \item \texttt{\#pragma HLS DATAFLOW}\\ {\small\textcolor{textMuted}{Enables concurrent execution: Total latency = $\max(\text{Stage Latencies})$ instead of $\sum$}}
+    \item \texttt{\#pragma HLS PIPELINE II=1} inside each function\\ {\small\textcolor{textMuted}{Achieves single-cycle throughput per 512-bit chunk}}
+    \item \texttt{\#pragma HLS STREAM variable=... depth=16}\\ {\small\textcolor{textMuted}{Provides buffering slack to prevent producer-consumer stalls}}
 \end{itemize}
 
 \textbf{\faBalanceScale\hspace{2mm}Trade-offs:}
 \begin{itemize}[leftmargin=5mm, itemsep=1mm]
     \item[\textcolor{successGreen}{\faCheckCircle}] Highest throughput due to overlapped stage execution
-    \item[\textcolor{successGreen}{\faCheckCircle}] Minimal latency (close to theoretical minimum)
     \item[\textcolor{successGreen}{\faCheckCircle}] Memory-efficient streaming (no full-frame buffering)
     \item[\textcolor{dangerRed}{\faTimesCircle}] Most complex implementation
-    \item[\textcolor{dangerRed}{\faTimesCircle}] Requires careful stream depth tuning to avoid deadlock
 \end{itemize}
 \end{versionbox}
-
-\newpage
 
 \section{HLS Synthesis Results}
 
@@ -464,7 +494,6 @@ static hls::stream<uint512_t> stream_filt("s_filt");
         Target Clock Period (ns) & 10.00 & 10.00 & 10.00 \\
         Estimated Clock (ns) & \textbf{7.30} & \textbf{7.30} & \textbf{7.30} \\
         \rowcolor{lightBlueBg!55} Latency (cycles) & \textbf{67632} & \textbf{3104} & \textbf{1048} \\
-        Execution Time ($\mu$s) & \textbf{676.32} & \textbf{31.04} & \textbf{10.48} \\
         \midrule[0.8pt]
         \multicolumn{4}{c}{\textbf{Resource Utilization}} \\
         \midrule[0.8pt]
@@ -478,7 +507,9 @@ static hls::stream<uint512_t> stream_filt("s_filt");
 
 \end{mytitledbox}
 
-\subsection{Loop-Level Latency Breakdown}
+\vspace{2mm}
+
+\subsection*{Loop-Level Latency Breakdown}
 
 The Vitis HLS Performance \& Resource Estimates provide detailed loop-level latency analysis, revealing the bottlenecks in each implementation.
 
@@ -503,12 +534,16 @@ The Vitis HLS Performance \& Resource Estimates provide detailed loop-level late
 \begin{solutionbox}
 {\color{dangerRed}\faExclamationTriangle}\hspace{2mm}\textbf{V1 Bottleneck Analysis:}
 
+\vspace{2mm}
+
 The filter stage (\texttt{Pipeline\_Filter\_Row\_Filter\_Col}) accounts for \highlight{97\%} of total latency. This is because:
 \begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1mm]
-    \item The 2D array access pattern with row-by-row processing creates dependencies
-    \item Despite array partitioning, the nested loop structure limits parallelism
-    \item Each row requires accessing three rows of the 2D buffer for convolution
+    \item The nested loop processes \textbf{one pixel per cycle} (II=1 on inner loop only)
+    \item Total filter cycles = HEIGHT $\times$ WIDTH = 256 $\times$ 256 = 65,536 cycles
 \end{itemize}
+    {\color{warningOrange}\faExclamationCircle}\hspace{2mm}\textbf{Optimization Opportunity:}
+    \vspace{1mm}
+    The posterize and pack stages already leverage 512-bit parallelism (64 pixels/cycle). Extending this to the filter stage could reduce it from 65,536 to just 1,024 cycles
 \end{solutionbox}
 
 \begin{table}[H]
@@ -532,15 +567,20 @@ The filter stage (\texttt{Pipeline\_Filter\_Row\_Filter\_Col}) accounts for \hig
 \begin{solutionbox}
 {\color{successGreen}\faLightbulb}\hspace{2mm}\textbf{V2 Optimization Strategy:}
 
+\vspace{2mm}
+
 By switching to line buffers and a sliding window approach, V2 achieves:
 \begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1mm]
     \item \highlight{63× faster} filter stage (1,032 vs 65,551 cycles)
-    \item Balanced stage latencies: Posterize (1,027), Filter (1,032), Write (1,027)
-    \item The line buffer stores only 2 rows instead of the full frame
+    \item Balanced stage latencies: Posterize (1,027), Filter (1,042), Write (1,027)
 \end{itemize}
-\vspace{2mm}
-{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}However, stages still execute \textbf{sequentially}, so total latency = $\sum$ stage latencies.}}
+
+{\color{warningOrange}\faExclamationCircle}\hspace{2mm}\textbf{Optimization Opportunity:}
+\vspace{1mm}
+With nearly identical stage latencies ($\sim$1,030 cycles each), the three stages could run \textit{concurrently} using HLS streams and \texttt{DATAFLOW}. This would reduce total latency from $\sum = 3,104$ cycles to $\max = 1,042$ cycles, a \highlight{3$\times$ improvement}. The key change is replacing BRAM intermediate buffers with \texttt{stream} FIFOs and refactoring each stage into a separate function.
+
 \end{solutionbox}
+
 
 \begin{table}[H]
     \centering
@@ -553,7 +593,6 @@ By switching to line buffers and a sliding window approach, V2 achieves:
         \midrule[0.8pt]
         \texttt{IMAGE\_DIFF\_POSTERIZE} (Top) & \textbf{1,049} \\
         \midrule
-        \quad \texttt{entry\_proc} & 0 \\
         \quad \texttt{compute\_diff\_wide} & 1,035 \\
         \rowcolor{lightBlueBg!55} \quad \texttt{apply\_filter\_wide} & \textbf{1,042} \\
         \quad \texttt{write\_result\_wide} & 1,035 \\
@@ -564,36 +603,28 @@ By switching to line buffers and a sliding window approach, V2 achieves:
 \begin{solutionbox}
 {\color{secondaryTeal}\faBolt}\hspace{2mm}\textbf{V3 Dataflow Parallelism:}
 
-With \texttt{\#pragma HLS DATAFLOW}, all three functions execute \textbf{concurrently}. The total latency equals the \textbf{maximum} stage latency (1,042 cycles for \texttt{apply\_filter\_wide}) plus minimal overhead, achieving \highlight{1,049 cycles}---approaching the theoretical minimum of 1,024 cycles for a 256×256 image with 64 pixels/cycle throughput.
+\vspace{2mm}
+
+With \texttt{\#pragma HLS DATAFLOW}, all three functions execute \textbf{concurrently}. Instead of waiting for one stage to complete before starting the next, stages process different chunks simultaneously.
+
+\vspace{2mm}
+The total latency equals the \textbf{slowest stage} (1,042 cycles for \texttt{apply\_filter\_wide}) plus pipeline fill/drain overhead ($\sim$7 cycles), achieving \highlight{1,049 cycles}, only \textbf{2.4\% above} the theoretical minimum of 1,024 cycles for a 256×256 image.
+
+\vspace{2mm}
+{\color{successGreen}\faCheckCircle}\hspace{2mm}\textbf{Key Insight:} Balanced stage latencies are critical for dataflow efficiency. If one stage were significantly slower, it would bottleneck the entire pipeline.
 \end{solutionbox}
 
-\subsection{Analysis}
-
-\begin{solutionbox}
-{\color{accentBlue}\faTachometerAlt}\hspace{2mm}\textbf{Performance Analysis:}
-\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1.5mm]
-    \item \textbf{V1} uses full-frame 2D buffers with array partitioning for parallel access. The filter stage iterates row-by-row with direct neighbor access.
-    \item \textbf{V2} optimizes memory storage by keeping data in 512-bit format but uses sequential stage execution.
-    \item \textbf{V3} achieves the lowest latency through dataflow parallelism, allowing all three stages to execute concurrently on different data chunks.
-\end{itemize}
-
-\vspace{3mm}
-{\color{purpleAccent}\faMemory}\hspace{2mm}\textbf{Resource Trade-offs:}
-\begin{itemize}[label=\textcolor{purpleAccent}{\faAngleRight}, leftmargin=5mm, itemsep=1.5mm]
-    \item V1 and V2 require more BRAM for intermediate storage
-    \item V3 uses streams with depth=16, minimizing buffering requirements
-    \item All versions unroll the 64-pixel inner loop, resulting in similar LUT usage
-\end{itemize}
-\end{solutionbox}
-
+\newpage
 
 \section{Vitis IDE Execution Results}
 
-The following results are obtained from running the accelerator on actual FPGA hardware using Vitis IDE.
+The following results are obtained from running Emulation-HW using Vitis IDE.
 
 \subsection{Kernel Execution Statistics}
 
 \begin{mytitledbox}{Kernels \& Compute Units $\rightarrow$ Kernel Execution}
+
+\vspace{-2mm}  % Counteract the top padding
 
 \begin{table}[H]
     \centering
@@ -605,19 +636,34 @@ The following results are obtained from running the accelerator on actual FPGA h
         \textbf{\textcolor{primaryBlue}{Metric}} & \textbf{\textcolor{primaryBlue}{V1}} & \textbf{\textcolor{primaryBlue}{V2}} & \textbf{\textcolor{primaryBlue}{V3}} \\
         \midrule[0.8pt]
         Kernel Name & IMAGE\_DIFF & IMAGE\_DIFF & IMAGE\_DIFF \\
-        \rowcolor{lightBlueBg!55} Compute Units & 1 & 1 & 1 \\
-        Clock Frequency (MHz) & 300 & 300 & 300 \\
-        \rowcolor{lightBlueBg!55} Compute Unit Time ($\mu$s) & \textbf{230} & \textbf{15} & \textbf{11} \\
-        Kernel Execution Time ($\mu$s) & \textbf{233} & \textbf{28} & \textbf{16} \\
+        \rowcolor{lightBlueBg!55} Clock Frequency (MHz) & 300 & 300 & 300 \\
+        \textbf{Compute Unit Time ($\mu$s)} & \textbf{230} & \textbf{15} & \textbf{11} \\
+        \rowcolor{lightBlueBg!55} Kernel Execution Time ($\mu$s) & 233 & 22 & 16 \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
 
+{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Source for clock frequency: \texttt{hw\_link $\rightarrow$ Emulation-HW $\rightarrow$ binary\_container $\rightarrow$ Link Summary}. Target: 300 MHz, Estimated: \textbf{411 MHz}.}}
+
 \end{mytitledbox}
+
+\begin{solutionbox}
+{\color{accentBlue}\faInfoCircle}\hspace{2mm}\textbf{Compute Unit Time vs. Kernel Execution Time:}
+
+\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1.5mm]
+    \item \textbf{Compute Unit (CU) Time:} Measures the time the hardware compute unit is actively executing, from when the CU starts processing to when it signals completion. This reflects the \textit{pure hardware execution time} including any memory stalls within the CU.
+    
+    \item \textbf{Kernel Execution Time:} Measures the total time from when the host issues the kernel launch (e.g., \texttt{clEnqueueNDRangeKernel}) to when the kernel completes. This includes CU Time \textit{plus} software overhead (eg kernel setup)
+\end{itemize}
+
+{\small\textcolor{textMuted}{\faLightbulb\hspace{2mm}The difference represents the runtime/launch overhead, which is $\approx constant$ regardless of kernel complexity. For faster kernels, it becomes a larger fraction of total time.}}
+\end{solutionbox}
 
 \subsection{Kernel Data Transfers}
 
 \begin{mytitledbox}{Kernel Data Transfers $\rightarrow$ Top Kernel Data Transfer}
+
+\vspace{-2mm}  % Counteract the top padding
 
 \begin{table}[H]
     \centering
@@ -638,29 +684,68 @@ The following results are obtained from running the accelerator on actual FPGA h
 
 \end{mytitledbox}
 
+
 \subsubsection{Understanding Kernel Transfer Metrics}
 
 \begin{solutionbox}
-{\color{accentBlue}\faDatabase}\hspace{2mm}\textbf{AXI Burst Coalescing:}
-
-The \textbf{Average Transfer Size of 1024 bytes} is achieved through \textbf{AXI burst coalescing}. Although the kernel uses 512-bit (64-byte) memory ports via \texttt{uint512\_t}, the AXI infrastructure groups sequential accesses into larger bursts:
-
-\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1mm]
-    \item Each memory access moves 64 bytes (512 bits $\div$ 8)
-    \item Sequential, pipelined accesses with II=1 are coalesced
-    \item Memory controller issues \textbf{burst length 16} transactions
-    \item Each burst: $16 \times 64 = \mathbf{1024}$ \textbf{bytes}
-\end{itemize}
+{\color{accentBlue}\faDatabase}\hspace{2mm}\textbf{Mechanism: AXI Burst Inference}
 
 \vspace{2mm}
-{\color{purpleAccent}\faBolt}\hspace{2mm}\textbf{Total Transfers = 64:}
+
+The discrepancy between the code's 64-byte read and the profiler's 1024-byte transfer is due to \textbf{Burst Inference}. The HLS compiler analyzes the access pattern in the loop:
+\begin{itemize}[label=\textcolor{accentBlue}{\faCode}, leftmargin=5mm, itemsep=0mm]
+    \item \texttt{for (int i = 0; i < TOTAL\_CHUNKS; i++) \{ ... A[i] ... \}}
+\end{itemize}
+Because memory addresses are accessed sequentially ($i, i+1, i+2\dots$) inside a pipelined loop (II=1), the memory controller groups multiple logical requests into a single physical transaction to amortize control overhead.
+
+\vspace{2mm}
+{\color{purpleAccent}\faCalculator}\hspace{2mm}\textbf{Deriving the 1024-Byte Transfer Size}
+
+\vspace{2mm}
+
+The AXI interface uses a \textit{Burst Length} of 16 beats to saturate bandwidth:
+\begin{itemize}[label=\textcolor{purpleAccent}\faAngleRight, leftmargin=5mm, itemsep=1mm]
+    \item \textbf{1 Beat (Logical Read):} Defined by \texttt{uint512\_t} = 512 bits = \textbf{64 Bytes}.
+    \item \textbf{1 Burst (Physical Tx):} The controller coalesces 16 beats per transaction.
+    \item \textbf{Calculation:} $16 \text{ beats} \times 64 \text{ bytes/beat} = \mathbf{1024 \text{ Bytes}}$.
+\end{itemize}
+
+\vspace{1mm}
+\noindent\textbf{Verification against Profiler Data:}
+
+\vspace{2mm}
 
 \begin{tabular}{@{}ll@{}}
-Total 512-bit chunks: & TOTAL\_CHUNKS = $4 \times 256 = 1024$ chunks \\
-Chunks per burst: & 16 (AXI burst coalescing) \\
-\textbf{Bursts per buffer:} & $1024 \div 16 = \mathbf{64}$ bursts \\
+\textbf{Total Image Size:} & $256 \times 256 \text{ pixels} = 65,536 \text{ Bytes (64 KB)}$ \\
+\textbf{Total Transfers:} & $65,536 \text{ Bytes} \div 1024 \text{ Bytes/Burst} = \mathbf{64 \text{ Transfers}}$ \\
 \end{tabular}
 \end{solutionbox}
+
+\begin{solutionbox}
+{\color{warningOrange}\faQuestionCircle}\hspace{2mm}\textbf{Why V1 \& V2 have same Transfer Rates and higher than V3?}
+
+\vspace{2mm}
+\textbf{V1 and V2} share the same \textbf{sequential execution model}:
+\begin{enumerate}[label=\textcolor{accentBlue}{\arabic*.}, itemsep=1mm, leftmargin=6mm]
+    \item Read all input data (A, B) $\rightarrow$ store in local BRAM
+    \item Process (posterize, filter)
+    \item Write all output (C) to DDR
+\end{enumerate}
+
+This creates \textbf{non-overlapping, sequential memory bursts} that fully utilize the AXI bus during each phase, achieving maximum burst efficiency (\textbf{9595.3 MB/s}).
+
+\vspace{3mm}
+\textbf{V3} uses \texttt{\#pragma HLS DATAFLOW}, making all stages run \textbf{concurrently}:
+\begin{itemize}[label=\textcolor{dangerRed}{$\bullet$}, leftmargin=5mm, itemsep=1mm]
+    \item \texttt{compute\_diff\_wide} is \textbf{reading} from A/B
+    \item \texttt{write\_result\_wide} is \textbf{writing} to C
+    \item Both compete for the \textbf{same memory controller} simultaneously
+\end{itemize}
+
+This \textbf{memory contention} reduces the effective transfer rate to \textbf{8868.2 MB/s}. However, the trade-off is worthwhile, since V3's overlapped execution still achieves the \highlight{fastest execution time (11 $\mu$s)}.
+\end{solutionbox}
+
+
 
 \begin{solutionbox}
 {\color{warningOrange}\faExclamationCircle}\hspace{2mm}\textbf{Transfer Efficiency = 25\%:}
@@ -687,36 +772,30 @@ For V3:
     \caption{Host-to-device and device-to-host transfer statistics (same for all versions).}
     \label{tab:host_transfers}
     
-    \begin{tabular}{@{}l c@{}}
+    \begin{tabular}{@{}l c c c@{}}
         \toprule[1.5pt]
-        \textbf{\textcolor{primaryBlue}{Metric}} & \textbf{\textcolor{primaryBlue}{Value}} \\
+        \textbf{\textcolor{primaryBlue}{Metric}} & \textbf{\textcolor{primaryBlue}{Host to Device}} & \textbf{\textcolor{primaryBlue}{Device to Host}} & \textbf{\textcolor{primaryBlue}{Unit}} \\
         \midrule[0.8pt]
-        \multicolumn{2}{c}{\textbf{Host to Device}} \\
-        \midrule[0.8pt]
-        Transfer Count & \textbf{1} \\
-        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{3.153} \\
-        Avg Size (Bytes) & \textbf{131072} \\
-        \midrule[0.8pt]
-        \multicolumn{2}{c}{\textbf{Device to Host}} \\
-        \midrule[0.8pt]
-        Transfer Count & \textbf{1} \\
-        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{1.422} \\
-        Avg Size (Bytes) & \textbf{65536} \\
+        Transfer Count & \textbf{1} & \textbf{1} & -- \\
+        \rowcolor{lightBlueBg!55} Transfer Rate & \textbf{3.151} & \textbf{3.135} & MB/s \\
+        Avg Transfer Size & \textbf{131,072} & \textbf{65,536} & Bytes \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
 
 \end{mytitledbox}
 
-\subsubsection{Understanding Host vs Kernel Transfer Rate Difference}
+\subsubsection*{Understanding Host vs Kernel Transfer Rate Difference}
 
 \begin{solutionbox}
 {\color{dangerRed}\faExclamationTriangle}\hspace{2mm}\textbf{Dramatic Rate Difference:}
 
+\vspace{2mm}
+
 \begin{tabular}{@{}lrl@{}}
-\textbf{Host $\leftrightarrow$ Device:} & $\sim$3.1 MB/s & (PCIe path) \\
-\textbf{Kernel $\leftrightarrow$ DDR:} & $\sim$8868 MB/s & (On-chip AXI path) \\
-\textbf{Ratio:} & $\sim$2800$\times$ & slower for host transfers \\
+\textbf{Host $\leftrightarrow$ Device:} & $\sim$3 MB/s & (PCIe path) \\
+\textbf{Kernel $\leftrightarrow$ DDR:} & $\sim$9000 MB/s & (On-chip AXI path) \\
+\textbf{Ratio:} & $\sim$3000$\times$ & slower for host transfers \\
 \end{tabular}
 
 \vspace{3mm}
@@ -728,17 +807,16 @@ For V3:
     \item \textbf{Different Memory Paths:}
     \begin{itemize}[label=\textcolor{purpleAccent}{$\bullet$}, leftmargin=4mm]
         \item \textbf{Kernel $\leftrightarrow$ DDR:} Uses on-chip 512-bit wide AXI bus directly connected to DDR memory controller
-        \item \textbf{Host $\leftrightarrow$ Device:} Traverses PCIe bus with DMA engines and multiple protocol layers
+        \item \textbf{Host $\leftrightarrow$ Device:} Traverses PCIe bus with DMA engines
     \end{itemize}
     
-    \item \textbf{Small Transfer Size Overhead:} With only 128 KB write and 64 KB read, fixed latency overhead (DMA descriptor setup, address negotiation) dominates the transfer time. Larger data sizes amortize this overhead.
-    
-    \item \textbf{No Transfer/Compute Overlap:} The host code uses sequential, blocking operations without double-buffering or pipelining.
 \end{enumerate}
 \end{solutionbox}
 
 \begin{solutionbox}
-{\color{successGreen}\faCheck}\hspace{2mm}\textbf{Host Transfer Size Breakdown:}
+{\faInfoCircle}\hspace{2mm}\textbf{Host Transfer Size Breakdown:}
+
+\vspace{2mm}
 
 \begin{tabular}{@{}lr@{}}
 \textbf{Host $\rightarrow$ Device (WRITE):} & \textbf{131072 Bytes} \\
@@ -750,7 +828,7 @@ For V3:
 \end{tabular}
 
 \vspace{2mm}
-{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Buffer size = TOTAL\_CHUNKS $\times$ PIXELS\_PER\_CHUNK = $1024 \times 64 = 65536$B}}
+{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Buffer size = TOTAL\_CHUNKS $\times$ PIXELS\_CHUNK = $1024 \times 64 = 65536$ Bytes}}
 \end{solutionbox}
 
 \section{Performance Comparison Summary}
@@ -772,16 +850,16 @@ For V3:
         \rowcolor{lightBlueBg!55} Stage Parallelism & None & None & Full Overlap \\
         \midrule[0.8pt]
         HLS Latency (cycles) & \textbf{67632} & \textbf{3104} & \textbf{1048} \\
-        \rowcolor{lightBlueBg!55} FPGA Exec Time ($\mu$s) & \textbf{233} & \textbf{28} & \textbf{16} \\
-        BRAM Usage & Low & Medium & Low \\
-        \rowcolor{lightBlueBg!55} Implementation Complexity & Simple & Medium & High \\
+        \rowcolor{lightBlueBg!55} FPGA Exec Time ($\mu$s) & \textbf{230} & \textbf{15} & \textbf{11} \\
+        BRAM Usage & High & Medium & Low \\
+        \rowcolor{lightBlueBg!55} Implementation Complexity & Low & Medium & High \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
 
 \end{mytitledbox}
 
-\subsection{Speed-up Calculation}
+\subsection{Theoretical Speed-up Calculation}
 
 \begin{solutionbox}
 \hspace{2mm}\textbf{V3 vs V1 Speed-up:}
@@ -791,41 +869,35 @@ $$ \text{Speedup} = \frac{\text{Latency}_{V1}}{\text{Latency}_{V3}} = \frac{6763
 $$ \text{Speedup} = \frac{\text{Latency}_{V2}}{\text{Latency}_{V3}} = \frac{3104}{1048} \approx \mathbf{2.96 \times} $$
 \end{solutionbox}
 
-\subsection{Theoretical vs. Actual Performance}
+
+\subsection{Theoretical vs. Actual Performance Analysis}
 
 \begin{solutionbox}
-{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{Important: Clock Frequency Mismatch}
+{\color{accentBlue}\faInfoCircle}\hspace{2mm}\textbf{The Discrepancy: Port Parallelism vs. Memory Bandwidth}
 
-The HLS synthesis report uses a \textbf{10 ns target period (100 MHz)}, but the Vitis system actually runs the kernel at \textbf{300 MHz}. This explains the apparent discrepancy between HLS estimates and measured execution times:
+Although the code defines separate AXI bundles (\texttt{gmemA}, \texttt{gmemB}, \texttt{gmemC}) to create independent ports on the FPGA, the default system configuration maps all these ports to a \textbf{single shared DDR memory bank}.
 
-\vspace{2mm}
-\begin{tabular}{@{}l r r r r@{}}
-\toprule
-\textbf{Version} & \textbf{Latency} & \textbf{HLS @ 100MHz} & \textbf{IDE @ 300MHz} & \textbf{Measured} \\
-\midrule
-V1 & 67,632 cycles & 676 $\mu$s & 225 $\mu$s & \textbf{233 $\mu$s} \\
-V2 & 3,104 cycles & 31 $\mu$s & 10.3 $\mu$s & \textbf{28 $\mu$s} \\
-V3 & 1,048 cycles & 10.5 $\mu$s & 3.5 $\mu$s & \textbf{16 $\mu$s} \\
-\bottomrule
-\end{tabular}
+This creates a classic "Many-to-One" bottleneck:
 
-\vspace{2mm}
-{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Source: \texttt{hw\_link $\rightarrow$ Emulation-HW $\rightarrow$ binary\_container $\rightarrow$ Link Summary}. Target: 300 MHz, Estimated: \textbf{411 MHz}.}}
-\end{solutionbox}
-
-\begin{solutionbox}
-{\color{accentBlue}\faQuestionCircle}\hspace{2mm}\textbf{Why Do V2/V3 Still Show Higher Measured Times?}
-
-While V1's measured time (233 $\mu$s) closely matches the 300 MHz prediction (225 $\mu$s), V2 and V3 show larger gaps. This is because:
-
-\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1.5mm]
-    \item \textbf{Fixed Overhead Dominance:} Kernel launch, AXI setup, and memory initialization add $\sim$10--15 $\mu$s of constant overhead. For V1 (225 $\mu$s compute), this is only 5\%. For V3 (3.5 $\mu$s compute), it dominates.
-    \item \textbf{Memory Bandwidth Bottleneck:} V2 and V3's faster compute exposes DDR access latency as the limiting factor.
-    \item \textbf{Stream/Dataflow Overhead:} V3's HLS streams have synchronization costs not captured in cycle estimates.
+\begin{itemize}[label=\textcolor{dangerRed}{\faExclamationTriangle}, leftmargin=5mm, itemsep=2mm]
+    \item \textbf{FPGA Demand:} The V3 kernel attempts to Read A, Read B, and Write C simultaneously. At 300 MHz with 512-bit width, the requested aggregate bandwidth is:
+    $$ \text{BW per stream} = \frac{512 \text{ bits}}{8} \times 300 \text{ MHz} = 64 \text{ B} \times 300 \text{ M/s} = 19.2 \text{ GB/s} $$
+    $$ \text{Total Demand} = 3 \text{ streams} \times 19.2 \text{ GB/s} \approx \mathbf{57.6 \text{ GB/s}} $$
+    
+    \item \textbf{Memory Supply:} A single DDR4 channel (typical in emulation and default hardware mapping) has a peak theoretical bandwidth of only $\approx \mathbf{19.2 \text{ GB/s}}$.
 \end{itemize}
 
 \vspace{2mm}
-{\small\textcolor{textMuted}{\faLightbulb\hspace{2mm}For larger images, the compute-to-overhead ratio improves, and measured times would approach the 300 MHz predictions.}}
+\textbf{The Resulting Slowdown:}
+Since the memory controller cannot serve 57.6 GB/s, it throttles the kernel. The effective execution time becomes determined by the memory limit, not the compute logic:
+
+$$ \text{Actual Time} \approx \text{Ideal Compute Time} \times \frac{\text{Demand}}{\text{Supply}} $$
+$$ 11 \mu s \approx 3.5 \mu s \times 3 $$
+
+{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Note: This 3$\times$ ratio is a first-order approximation. Actual performance may vary slightly due to memory arbitration overhead, burst scheduling inefficiencies, and controller latency.}}
+
+\vspace{2mm}
+This confirms that while \texttt{accelerated\_v3} is logically capable of 3.5 $\mu$s execution, it is strictly \textbf{memory bound} in this system configuration. To realize the full potential of V3, one would need to map \texttt{gmemA}, \texttt{gmemB}, and \texttt{gmemC} to separate physical DDR banks (e.g., DDR[0], DDR[1], DDR[2]) using a connectivity configuration file.
 \end{solutionbox}
 
 \section{Conclusion}
