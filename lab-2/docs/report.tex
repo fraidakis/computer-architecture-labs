@@ -606,7 +606,9 @@ The following results are obtained from running the accelerator on actual FPGA h
         \midrule[0.8pt]
         Kernel Name & IMAGE\_DIFF & IMAGE\_DIFF & IMAGE\_DIFF \\
         \rowcolor{lightBlueBg!55} Compute Units & 1 & 1 & 1 \\
-        Execution Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{17} \\
+        Clock Frequency (MHz) & 300 & 300 & 300 \\
+        \rowcolor{lightBlueBg!55} Compute Unit Time ($\mu$s) & \textbf{230} & \textbf{15} & \textbf{11} \\
+        Kernel Execution Time ($\mu$s) & \textbf{233} & \textbf{28} & \textbf{16} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
@@ -626,10 +628,10 @@ The following results are obtained from running the accelerator on actual FPGA h
         \toprule[1.5pt]
         \textbf{\textcolor{primaryBlue}{Metric}} & \textbf{\textcolor{primaryBlue}{V1}} & \textbf{\textcolor{primaryBlue}{V2}} & \textbf{\textcolor{primaryBlue}{V3}} \\
         \midrule[0.8pt]
-        Total Transfers & \textbf{XXX} & \textbf{XXX} & \textbf{64} \\
-        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{8868.2} \\
-        Avg Transfer Size (Bytes) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{1024} \\
-        \rowcolor{lightBlueBg!55} Link Utilization (\%) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{25} \\
+        Total Transfers & \textbf{64} & \textbf{64} & \textbf{64} \\
+        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{9595.3} & \textbf{9595.3} & \textbf{8868.2} \\
+        Avg Transfer Size (Bytes) & \textbf{1024} & \textbf{1024} & \textbf{1024} \\
+        \rowcolor{lightBlueBg!55} Link Utilization (\%) & \textbf{25} & \textbf{25} & \textbf{25} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
@@ -682,24 +684,24 @@ For V3:
 
 \begin{table}[H]
     \centering
-    \caption{Host-to-device and device-to-host transfer statistics.}
+    \caption{Host-to-device and device-to-host transfer statistics (same for all versions).}
     \label{tab:host_transfers}
     
-    \begin{tabular}{@{}l c c c@{}}
+    \begin{tabular}{@{}l c@{}}
         \toprule[1.5pt]
-        \textbf{\textcolor{primaryBlue}{Metric}} & \textbf{\textcolor{primaryBlue}{V1}} & \textbf{\textcolor{primaryBlue}{V2}} & \textbf{\textcolor{primaryBlue}{V3}} \\
+        \textbf{\textcolor{primaryBlue}{Metric}} & \textbf{\textcolor{primaryBlue}{Value}} \\
         \midrule[0.8pt]
-        \multicolumn{4}{c}{\textbf{Host to Device}} \\
+        \multicolumn{2}{c}{\textbf{Host to Device}} \\
         \midrule[0.8pt]
-        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{1} \\
-        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{3.153} \\
-        Avg Size (Bytes) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{131072} \\
+        Transfer Count & \textbf{1} \\
+        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{3.153} \\
+        Avg Size (Bytes) & \textbf{131072} \\
         \midrule[0.8pt]
-        \multicolumn{4}{c}{\textbf{Device to Host}} \\
+        \multicolumn{2}{c}{\textbf{Device to Host}} \\
         \midrule[0.8pt]
-        Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{1} \\
-        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{1.422} \\
-        Avg Size (Bytes) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{65536} \\
+        Transfer Count & \textbf{1} \\
+        \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{1.422} \\
+        Avg Size (Bytes) & \textbf{65536} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
@@ -769,8 +771,8 @@ For V3:
         Filter Implementation & Direct 2D & Line Buffer & Line Buffer \\
         \rowcolor{lightBlueBg!55} Stage Parallelism & None & None & Full Overlap \\
         \midrule[0.8pt]
-        HLS Latency (cycles) & \textbf{XXXXX} & \textbf{XXXXX} & \textbf{XXXXX} \\
-        \rowcolor{lightBlueBg!55} FPGA Exec Time ($\mu$s) & \textbf{XXX.XX} & \textbf{XXX.XX} & \textbf{XXX.XX} \\
+        HLS Latency (cycles) & \textbf{67632} & \textbf{3104} & \textbf{1048} \\
+        \rowcolor{lightBlueBg!55} FPGA Exec Time ($\mu$s) & \textbf{233} & \textbf{28} & \textbf{16} \\
         BRAM Usage & Low & Medium & Low \\
         \rowcolor{lightBlueBg!55} Implementation Complexity & Simple & Medium & High \\
         \bottomrule[1.5pt]
@@ -783,34 +785,47 @@ For V3:
 
 \begin{solutionbox}
 \hspace{2mm}\textbf{V3 vs V1 Speed-up:}
-$$ \text{Speedup} = \frac{\text{Latency}_{V1}}{\text{Latency}_{V3}} = \frac{XXXXX}{XXXXX} \approx \mathbf{X.XX \times} $$
+$$ \text{Speedup} = \frac{\text{Latency}_{V1}}{\text{Latency}_{V3}} = \frac{67632}{1048} \approx \mathbf{64.5 \times} $$
 
 \hspace{2mm}\textbf{V3 vs V2 Speed-up:}
-$$ \text{Speedup} = \frac{\text{Latency}_{V2}}{\text{Latency}_{V3}} = \frac{XXXXX}{XXXXX} \approx \mathbf{X.XX \times} $$
+$$ \text{Speedup} = \frac{\text{Latency}_{V2}}{\text{Latency}_{V3}} = \frac{3104}{1048} \approx \mathbf{2.96 \times} $$
 \end{solutionbox}
 
 \subsection{Theoretical vs. Actual Performance}
 
 \begin{solutionbox}
-{\color{purpleAccent}\faBalanceScale}\hspace{2mm}\textbf{HLS Estimate vs. FPGA Execution (V3):}
+{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{Important: Clock Frequency Mismatch}
 
-\begin{tabular}{@{}ll@{}}
-\textbf{HLS Estimated Latency:} & 1,048 cycles $\times$ 10 ns = \textbf{10.48 $\mu$s} \\
-\textbf{Actual FPGA Execution:} & \textbf{17 $\mu$s} \\
-\textbf{Overhead:} & $\sim$62\% additional time \\
+The HLS synthesis report uses a \textbf{10 ns target period (100 MHz)}, but the Vitis system actually runs the kernel at \textbf{300 MHz}. This explains the apparent discrepancy between HLS estimates and measured execution times:
+
+\vspace{2mm}
+\begin{tabular}{@{}l r r r r@{}}
+\toprule
+\textbf{Version} & \textbf{Latency} & \textbf{HLS @ 100MHz} & \textbf{IDE @ 300MHz} & \textbf{Measured} \\
+\midrule
+V1 & 67,632 cycles & 676 $\mu$s & 225 $\mu$s & \textbf{233 $\mu$s} \\
+V2 & 3,104 cycles & 31 $\mu$s & 10.3 $\mu$s & \textbf{28 $\mu$s} \\
+V3 & 1,048 cycles & 10.5 $\mu$s & 3.5 $\mu$s & \textbf{16 $\mu$s} \\
+\bottomrule
 \end{tabular}
 
-\vspace{3mm}
-{\color{accentBlue}\faQuestionCircle}\hspace{2mm}\textbf{Why the Difference?}
-\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1mm]
-    \item \textbf{Memory Access Latency:} HLS estimates assume ideal memory conditions. Real DDR access introduces variable latency for burst reads/writes.
-    \item \textbf{Kernel Launch Overhead:} OpenCL runtime adds setup time for command queue dispatch and synchronization.
-    \item \textbf{Clock Domain Crossing:} Data transfers between PL (programmable logic) and DDR traverse clock domains, adding cycles.
-    \item \textbf{AXI Protocol Overhead:} Address negotiation and burst setup in AXI transactions not fully modeled by HLS.
+\vspace{2mm}
+{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Source: \texttt{hw\_link $\rightarrow$ Emulation-HW $\rightarrow$ binary\_container $\rightarrow$ Link Summary}. Target: 300 MHz, Estimated: \textbf{411 MHz}.}}
+\end{solutionbox}
+
+\begin{solutionbox}
+{\color{accentBlue}\faQuestionCircle}\hspace{2mm}\textbf{Why Do V2/V3 Still Show Higher Measured Times?}
+
+While V1's measured time (233 $\mu$s) closely matches the 300 MHz prediction (225 $\mu$s), V2 and V3 show larger gaps. This is because:
+
+\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1.5mm]
+    \item \textbf{Fixed Overhead Dominance:} Kernel launch, AXI setup, and memory initialization add $\sim$10--15 $\mu$s of constant overhead. For V1 (225 $\mu$s compute), this is only 5\%. For V3 (3.5 $\mu$s compute), it dominates.
+    \item \textbf{Memory Bandwidth Bottleneck:} V2 and V3's faster compute exposes DDR access latency as the limiting factor.
+    \item \textbf{Stream/Dataflow Overhead:} V3's HLS streams have synchronization costs not captured in cycle estimates.
 \end{itemize}
 
 \vspace{2mm}
-{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}For small images (256$\times$256), these fixed overheads dominate. As image size increases, the ratio of compute to overhead improves, and actual performance approaches HLS estimates.}}
+{\small\textcolor{textMuted}{\faLightbulb\hspace{2mm}For larger images, the compute-to-overhead ratio improves, and measured times would approach the 300 MHz predictions.}}
 \end{solutionbox}
 
 \section{Conclusion}
