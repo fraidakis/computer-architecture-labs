@@ -211,9 +211,9 @@ extern "C" {
 // --------------------------------------------------------------------------
 void IMAGE_DIFF_POSTERIZE(const uint512_t *A, const uint512_t *B, uint512_t *C)
 {
-#pragma HLS INTERFACE m_axi port = A offset = slave bundle = gmemA depth = TOTAL_CHUNKS
-#pragma HLS INTERFACE m_axi port = B offset = slave bundle = gmemB depth = TOTAL_CHUNKS
-#pragma HLS INTERFACE m_axi port = C offset = slave bundle = gmemC depth = TOTAL_CHUNKS
+#pragma HLS INTERFACE m_axi port = A offset = slave bundle = gmemA depth = TOTAL_CHUNKS storage_type = plram
+#pragma HLS INTERFACE m_axi port = B offset = slave bundle = gmemB depth = TOTAL_CHUNKS storage_type = plram
+#pragma HLS INTERFACE m_axi port = C offset = slave bundle = gmemC depth = TOTAL_CHUNKS storage_type = plram
 #pragma HLS INTERFACE s_axilite port = A bundle = control
 #pragma HLS INTERFACE s_axilite port = B bundle = control
 #pragma HLS INTERFACE s_axilite port = C bundle = control
