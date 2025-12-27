@@ -28,7 +28,7 @@
  *   [ 0 -1  0 ]
  */
 
-#include "../inc/hls_helpers.h"
+#include "../../inc/hls_helpers.h"
 
 extern "C" {
 
