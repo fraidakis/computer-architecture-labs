@@ -636,6 +636,46 @@ The following results are obtained from running the accelerator on actual FPGA h
 
 \end{mytitledbox}
 
+\subsubsection{Understanding Kernel Transfer Metrics}
+
+\begin{solutionbox}
+{\color{accentBlue}\faDatabase}\hspace{2mm}\textbf{AXI Burst Coalescing:}
+
+The \textbf{Average Transfer Size of 1024 bytes} is achieved through \textbf{AXI burst coalescing}. Although the kernel uses 512-bit (64-byte) memory ports via \texttt{uint512\_t}, the AXI infrastructure groups sequential accesses into larger bursts:
+
+\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1mm]
+    \item Each memory access moves 64 bytes (512 bits $\div$ 8)
+    \item Sequential, pipelined accesses with II=1 are coalesced
+    \item Memory controller issues \textbf{burst length 16} transactions
+    \item Each burst: $16 \times 64 = \mathbf{1024}$ \textbf{bytes}
+\end{itemize}
+
+\vspace{2mm}
+{\color{purpleAccent}\faBolt}\hspace{2mm}\textbf{Total Transfers = 64:}
+
+\begin{tabular}{@{}ll@{}}
+Total 512-bit chunks: & TOTAL\_CHUNKS = $4 \times 256 = 1024$ chunks \\
+Chunks per burst: & 16 (AXI burst coalescing) \\
+\textbf{Bursts per buffer:} & $1024 \div 16 = \mathbf{64}$ bursts \\
+\end{tabular}
+\end{solutionbox}
+
+\begin{solutionbox}
+{\color{warningOrange}\faExclamationCircle}\hspace{2mm}\textbf{Transfer Efficiency = 25\%:}
+
+Vitis calculates transfer efficiency using this formula:
+$$\text{Efficiency} = \frac{\text{Average Bytes}}{\min(\text{Memory Byte Width} \times 256, 4096)}$$
+
+For V3:
+\begin{itemize}[leftmargin=5mm, itemsep=1mm]
+    \item Memory Byte Width: $512 \div 8 = 64$ bytes
+    \item Memory Width $\times$ 256: $64 \times 256 = 16384$ bytes
+    \item $\min(16384, 4096) = \mathbf{4096}$ bytes (DDR page size limit)
+    \item Efficiency: $1024 \div 4096 = \mathbf{25\%}$
+\end{itemize}
+
+\end{solutionbox}
+
 \subsection{Host Data Transfers}
 
 \begin{mytitledbox}{Host Data Transfer $\rightarrow$ Host Transfer}
@@ -653,18 +693,63 @@ The following results are obtained from running the accelerator on actual FPGA h
         \midrule[0.8pt]
         Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{1} \\
         \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{3.153} \\
-        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{131.072} \\
+        Avg Size (Bytes) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{131072} \\
         \midrule[0.8pt]
         \multicolumn{4}{c}{\textbf{Device to Host}} \\
         \midrule[0.8pt]
         Transfer Count & \textbf{XXX} & \textbf{XXX} & \textbf{1} \\
         \rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & \textbf{XXXX.XX} & \textbf{XXXX.XX} & \textbf{1.422} \\
-        Avg Size (KB) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{65.536} \\
+        Avg Size (Bytes) & \textbf{XX.XX} & \textbf{XX.XX} & \textbf{65536} \\
         \bottomrule[1.5pt]
     \end{tabular}
 \end{table}
 
 \end{mytitledbox}
+
+\subsubsection{Understanding Host vs Kernel Transfer Rate Difference}
+
+\begin{solutionbox}
+{\color{dangerRed}\faExclamationTriangle}\hspace{2mm}\textbf{Dramatic Rate Difference:}
+
+\begin{tabular}{@{}lrl@{}}
+\textbf{Host $\leftrightarrow$ Device:} & $\sim$3.1 MB/s & (PCIe path) \\
+\textbf{Kernel $\leftrightarrow$ DDR:} & $\sim$8868 MB/s & (On-chip AXI path) \\
+\textbf{Ratio:} & $\sim$2800$\times$ & slower for host transfers \\
+\end{tabular}
+
+\vspace{3mm}
+{\color{accentBlue}\faQuestionCircle}\hspace{2mm}\textbf{Why Such a Large Difference?}
+
+\begin{enumerate}[label=\textcolor{accentBlue}{\arabic*.}, itemsep=2mm, leftmargin=6mm]
+    \item \textbf{Hardware Emulation vs Real Hardware:} The $\sim$3 MB/s rate is characteristic of \texttt{hw\_emu} mode, where PCIe transfers are \textit{simulated in software}. On real FPGA hardware, PCIe Gen3 x16 achieves 8--12 GB/s.
+    
+    \item \textbf{Different Memory Paths:}
+    \begin{itemize}[label=\textcolor{purpleAccent}{$\bullet$}, leftmargin=4mm]
+        \item \textbf{Kernel $\leftrightarrow$ DDR:} Uses on-chip 512-bit wide AXI bus directly connected to DDR memory controller
+        \item \textbf{Host $\leftrightarrow$ Device:} Traverses PCIe bus with DMA engines and multiple protocol layers
+    \end{itemize}
+    
+    \item \textbf{Small Transfer Size Overhead:} With only 128 KB write and 64 KB read, fixed latency overhead (DMA descriptor setup, address negotiation) dominates the transfer time. Larger data sizes amortize this overhead.
+    
+    \item \textbf{No Transfer/Compute Overlap:} The host code uses sequential, blocking operations without double-buffering or pipelining.
+\end{enumerate}
+\end{solutionbox}
+
+\begin{solutionbox}
+{\color{successGreen}\faCheck}\hspace{2mm}\textbf{Host Transfer Size Breakdown:}
+
+\begin{tabular}{@{}lr@{}}
+\textbf{Host $\rightarrow$ Device (WRITE):} & \textbf{131072 Bytes} \\
+\quad Buffer A (input image 1): & 65536 Bytes \\
+\quad Buffer B (input image 2): & 65536 Bytes \\
+\\
+\textbf{Device $\rightarrow$ Host (READ):} & \textbf{65536 Bytes} \\
+\quad Buffer C (output image): & 65536 Bytes \\
+\end{tabular}
+
+\vspace{2mm}
+{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Buffer size = TOTAL\_CHUNKS $\times$ PIXELS\_PER\_CHUNK = $1024 \times 64 = 65536$B}}
+\end{solutionbox}
 
 \section{Performance Comparison Summary}
 
@@ -744,5 +829,8 @@ $$ \text{Speedup} = \frac{\text{Latency}_{V2}}{\text{Latency}_{V3}} = \frac{XXXX
 \vspace{3mm}
 \textcolor{textMuted}{\faLightbulb}\hspace{2mm}\textit{The results demonstrate the trade-offs between implementation complexity, resource utilization, and performance. The dataflow architecture (V3) provides the best performance but requires careful design of stream depths and stage balancing.}
 \end{tcolorbox}
+
+\vspace{5mm}
+\noindent\textcolor{textMuted}{\faBook\hspace{2mm}\textbf{Reference:}} For more details on interpreting the Vitis profile summary, see the official AMD documentation: \href{https://docs.amd.com/r/2022.1-English/ug1393-vitis-application-acceleration/Interpreting-the-Profile-Summary}{Interpreting the Profile Summary}.
 
 \end{document}
