@@ -13,7 +13,7 @@
 * - Sliding window operates on 512-bit chunks.
 */
 
-#include "../inc/hls_helpers.h"
+#include "../../inc/hls_helpers.h"
 #include <hls_stream.h>
 
 // --------------------------------------------------------------------------
@@ -94,7 +94,7 @@ Loop_Filter_Wide:
 #pragma HLS PIPELINE II = 1
 
       // 1. Shift Window & Read New Data
-      uint512_t new_chunk;
+      uint512_t new_chunk = 0;
       if (iter < TOTAL_CHUNKS)
       {
           new_chunk = in_stream.read();
@@ -121,6 +121,12 @@ Loop_Filter_Wide:
           lb[0][col_idx] = lb[1][col_idx];
           lb[1][col_idx] = new_chunk;
       }
+      else
+      {
+          win[0][2] = 0;
+          win[1][2] = 0;
+          win[2][2] = 0;
+      }
 
       // 2. Compute Output for Center Chunk (win[1][1])
       int out_idx = iter - (CHUNKS_PER_ROW + 1);
@@ -130,7 +136,7 @@ Loop_Filter_Wide:
           int r_idx = out_idx / CHUNKS_PER_ROW; // Row index 0..255
           int c_chk = out_idx % CHUNKS_PER_ROW; // Chunk col index 0..3
 
-          uint512_t result_chunk;
+          uint512_t result_chunk = 0;
 
           // Border flags for cleaner logic
           const bool row_border = (r_idx == 0) || (r_idx == HEIGHT - 1);
@@ -219,8 +225,8 @@ void IMAGE_DIFF_POSTERIZE(const uint512_t *A, const uint512_t *B, uint512_t *C)
 #pragma HLS INTERFACE s_axilite port = C bundle = control
 #pragma HLS INTERFACE s_axilite port = return bundle = control
 
-   static hls::stream<uint512_t> stream_post("s_post");
-   static hls::stream<uint512_t> stream_filt("s_filt");
+    hls::stream<uint512_t> stream_post("s_post");
+    hls::stream<uint512_t> stream_filt("s_filt");
 
 #pragma HLS STREAM variable = stream_post depth = 16
 #pragma HLS STREAM variable = stream_filt depth = 16
