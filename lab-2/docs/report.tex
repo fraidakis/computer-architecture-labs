@@ -9,8 +9,7 @@
 \usepackage{fancyhdr}
 \usepackage{float}
 \usepackage{enumitem}
-\usepackage{float}
-\usepackage{enumitem}
+\usepackage{microtype}  % Improved typography
 
 % Additional packages for beautification
 \usepackage[skins,breakable,raster]{tcolorbox}
@@ -277,6 +276,13 @@ colbacktitle=purpleAccent,
 \begin{document}
 \maketitle
 
+\begin{abstract}
+\noindent
+This report presents the design and optimization of an FPGA-based image processing accelerator implementing absolute difference, posterization, and sharpening filter operations. Three architectural variants were developed: \textbf{V1} (sequential with 2D buffers), \textbf{V2} (sequential with line buffers), and \textbf{V3} (dataflow streaming). Key findings include a \textbf{64$\times$ theoretical speedup} from V1 to V3 through dataflow parallelism, and identification of memory bandwidth as the primary bottleneck. Multi-bank DDR mapping via \texttt{connectivity.cfg} reduced V3 execution time from 11~$\mu$s to \textbf{5~$\mu$s}, doubling transfer rates from 8.9 to 18.9~GB/s.
+\end{abstract}
+
+\newpage
+\tableofcontents
 \newpage
 
 \section{Introduction}
@@ -654,7 +660,7 @@ The following results are obtained from running Emulation-HW using Vitis IDE.
 \begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1.5mm]
     \item \textbf{Compute Unit (CU) Time:} Measures the time the hardware compute unit is actively executing, from when the CU starts processing to when it signals completion. This reflects the \textit{pure hardware execution time} including any memory stalls within the CU.
     
-    \item \textbf{Kernel Execution Time:} Measures the total time from when the host issues the kernel launch (e.g., \texttt{clEnqueueNDRangeKernel}) to when the kernel completes. This includes CU Time \textit{plus} software overhead (eg kernel setup)
+    \item \textbf{Kernel Execution Time:} Measures the total time from when the host issues the kernel launch (e.g., \texttt{clEnqueueNDRangeKernel}) to when the kernel completes. This includes CU Time \textit{plus} software overhead (eg kernel setup).
 \end{itemize}
 
 {\small\textcolor{textMuted}{\faLightbulb\hspace{2mm}The difference represents the runtime/launch overhead, which is $\approx constant$ regardless of kernel complexity. For faster kernels, it becomes a larger fraction of total time.}}
