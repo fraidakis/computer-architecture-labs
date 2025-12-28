@@ -962,71 +962,67 @@ To achieve the theoretical $\sim$3.5 $\mu$s execution time on real hardware, map
 \begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
 # connectivity.cfg
 [connectivity]
-sp=IMAGE_DIFF_POSTERIZE.gmemA:DDR[0]
-sp=IMAGE_DIFF_POSTERIZE.gmemB:DDR[1]
-sp=IMAGE_DIFF_POSTERIZE.gmemC:DDR[2]
+sp=IMAGE_DIFF_POSTERIZE_1.A:DDR[0]
+sp=IMAGE_DIFF_POSTERIZE_1.B:DDR[1]
+sp=IMAGE_DIFF_POSTERIZE_1.C:DDR[2]
 \end{lstlisting}
 
 \vspace{2mm}
 This eliminates memory contention by providing 3 $\times$ 19.2 GB/s = 57.6 GB/s of parallel bandwidth, matching the kernel's demand.
 \end{tipbox}
 
+\begin{solutionbox}
+{\color{successGreen}\faCheckCircle}\hspace{2mm}\textbf{Verified: V3 Performance After Multi-Bank DDR Mapping}
+
+\vspace{2mm}
+
+After applying the \texttt{connectivity.cfg} configuration to map each AXI bundle to a separate DDR bank:
+
+\vspace{2mm}
+
+\begin{tabular}{@{}lrr@{}}
+\textbf{Metric} & \textbf{Before (Single Bank)} & \textbf{After (Multi-Bank)} \\
+\midrule
+Clock Frequency & 300 MHz & 300 MHz \\
+\rowcolor{lightBlueBg!55} Compute Unit Time & \textbf{11 $\mu$s} & \textbf{5 $\mu$s} \\
+Kernel Execution Time & 16 $\mu$s & 9 $\mu$s \\
+\rowcolor{lightBlueBg!55} Transfer Rate (MB/s) & 8868.2 & \textbf{18886.5} \\
+\end{tabular}
+
+\vspace{3mm}
+
+{\color{accentBlue}\faChartLine}\hspace{2mm}\textbf{Key Observations:}
+
+\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1mm]
+    \item \textbf{2.2$\times$ faster CU time:} Eliminating memory contention reduced compute unit time from 11 $\mu$s to \textbf{5 $\mu$s}, approaching the theoretical 3.5 $\mu$s.
+    \item \textbf{2.1$\times$ higher transfer rate:} Kernel transfer rate increased from 8868.2 MB/s to \textbf{18886.5 MB/s}, nearly saturating the per-bank bandwidth.
+    \item \textbf{Host transfers unchanged:} Host-to-device and device-to-host rates remain $\sim$3 MB/s (PCIe emulation limited).
+\end{itemize}
+
+{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}The remaining gap between 5 $\mu$s and theoretical 3.5 $\mu$s is attributed to AXI protocol overhead and pipeline fill/drain latency.}}
+\end{solutionbox}
+
 % ---------------------------------------------------------------------------
 % V2 ANALYSIS (The Partial Bottleneck)
 % ---------------------------------------------------------------------------
 
 \begin{solutionbox}
-{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{V2 Performance Analysis: The Partial Bottleneck}
+{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{V2 Performance Analysis: Partial Bottleneck}
 
 \vspace{2mm}
-V2 also exhibits a performance gap, despite its sequential nature:
 
 \begin{tabular}{@{}lr@{}}
-\textbf{Theoretical Time:} & $3104 \div 300\text{ MHz} \approx \mathbf{10.3~\mu s}$ \\
-\textbf{Measured Time:} & $\mathbf{15~\mu s}$ \\
+\textbf{Theoretical:} & $3104 \div 300\text{ MHz} \approx \mathbf{10.3~\mu s}$ \\
+\textbf{Measured:} & $\mathbf{15~\mu s}$ (50\% slower) \\
 \end{tabular}
 
 \vspace{2mm}
-\textbf{Why the 50\% slowdown?}
-While the stages run sequentially, \textbf{Stage 1} still requires double the available bandwidth:
 
-\begin{enumerate}[label=\textcolor{accentBlue}{\arabic*.}, leftmargin=6mm, itemsep=1mm]
-    \item \textbf{Stage 1 (Difference \& Posterize):} Reads A and B simultaneously.
-    \begin{itemize}[label=$\rightarrow$]
-        \item Demand (38.4 GB/s) $>$ Supply (19.2 GB/s).
-        \item \textbf{Result:} Throttled by \textbf{2x} ($3.4~\mu s \rightarrow \mathbf{6.8~\mu s}$).
-    \end{itemize}
-    
-    \item \textbf{Stage 2 (Filter):} Reads/Writes local BRAM only.
-    \begin{itemize}[label=$\rightarrow$]
-        \item No DDR access. \textbf{Result:} Full speed ($\mathbf{3.5~\mu s}$).
-    \end{itemize}
-    
-    \item \textbf{Stage 3 (Memory Write):} Writes C only.
-    \begin{itemize}[label=$\rightarrow$]
-        \item Demand equals Supply (19.2 GB/s). \textbf{Result:} Full speed ($\mathbf{3.4~\mu s}$).
-    \end{itemize}
-\end{enumerate}
+\textbf{Root Cause:} Stage 1 reads A and B simultaneously, demanding 38.4 GB/s but limited to 19.2 GB/s. This 2$\times$ throttling on Stage 1 alone explains the gap:
 
-\end{solutionbox}
+$$ \text{Total} = \underbrace{6.8~\mu s}_{\text{Stage 1 (2$\times$)}} + \underbrace{3.5~\mu s}_{\text{Stage 2}} + \underbrace{3.4~\mu s}_{\text{Stage 3}} = 13.7~\mu s \approx \textbf{15}~\mu s $$
 
-
-\begin{solutionbox}
-{\color{secondaryTeal}\faCalculator}\hspace{2mm}\textbf{Final Calculation}
-
-\vspace{2mm}
-
-Adding up the actual time for all sequential stages:
-
-$$ \text{Total Time} = \underbrace{6.8~\mu s}_{\text{Stage 1 (Throttled)}} + \underbrace{3.5~\mu s}_{\text{Stage 2}} + \underbrace{3.4~\mu s}_{\text{Stage 3}} = \mathbf{13.7~\mu s} $$
-
-\vspace{2mm}
-
-The calculated 13.7 $\mu$s is very close to the measured \textbf{15 $\mu$s}. The remaining $\sim$1.3 $\mu$s accounts for kernel launch overhead and pipeline flushing.
-
-\vspace{3mm}
-
-{\color{accentBlue}\faLightbulb}\hspace{2mm}\textbf{Key Insight:} V2 is $\sim$1.5$\times$ slower because \textit{only Stage 1} tries to do 2 things at once (Read A + Read B), while the other stages operate within bandwidth limits.
+{\small\textcolor{textMuted}{\faLightbulb\hspace{1mm}V2 is only partially bottlenecked because Stages 2-3 operate within bandwidth limits.}}
 \end{solutionbox}
 
 
@@ -1038,34 +1034,34 @@ The calculated 13.7 $\mu$s is very close to the measured \textbf{15 $\mu$s}. The
 \begin{itemize}[leftmargin=5mm, itemsep=2mm]
     \item \textbf{V1 (Sequential + 2D Buffers):} Simplest implementation with pixel-by-pixel filter access. The 1-pixel/cycle filter stage creates a \textbf{97\% bottleneck}, resulting in 230 $\mu$s execution time.
     
-    \item \textbf{V2 (Sequential + Line Buffers):} Achieves 64 pixels/cycle in all stages via sliding window. However, Stage 1's simultaneous A/B reads cause \textbf{2$\times$ memory contention}, inflating execution from theoretical 10.3 $\mu$s to 15 $\mu$s.
+    \item \textbf{V2 (Sequential + Line Buffers):} Achieves 64 pixels/cycle in all stages via sliding window. Stage 1's simultaneous A/B reads cause \textbf{2$\times$ memory contention} (10.3 $\mu$s $\rightarrow$ 15 $\mu$s).
     
-    \item \textbf{V3 (Dataflow + Streams):} Maximum parallelism with concurrent stage execution. All 3 AXI ports active simultaneously create \textbf{3$\times$ memory contention}, limiting performance to 11 $\mu$s instead of theoretical 3.5 $\mu$s.
+    \item \textbf{V3 (Dataflow + Streams):} Maximum parallelism with concurrent stage execution. Default single-bank config caused \textbf{3$\times$ contention} (11 $\mu$s); multi-bank DDR mapping achieved \textbf{5 $\mu$s}.
 \end{itemize}
 \end{tcolorbox}
 
-\begin{warningbox}
-{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{Key Finding: Memory-Bound Performance}
+\begin{solutionbox}
+{\color{successGreen}\faCheckCircle}\hspace{2mm}\textbf{Key Finding: Memory Optimization Verified}
 
 \vspace{2mm}
 
-Both V2 and V3 are \textbf{memory-bound}, not compute-bound. Despite achieving near-optimal HLS latencies, actual execution times are limited by DDR bandwidth when multiple AXI ports share a single memory bank
+Both V2 and V3 are \textbf{memory-bound}. Mapping AXI bundles to separate DDR banks via \texttt{connectivity.cfg} eliminated contention for V3:
 
 \vspace{2mm}
 
-\begin{tabular}{@{}lcccc@{}}
-\textbf{Version} & \textbf{Theoretical} & \textbf{Measured} & \textbf{Bottleneck} & \textbf{Cause} \\
+\begin{tabular}{@{}lccc@{}}
+\textbf{Version} & \textbf{Theoretical} & \textbf{Single-Bank} & \textbf{Multi-Bank} \\
 \midrule
-V2 & 10.3 $\mu$s & 15 $\mu$s & 1.5$\times$ & Stage 1: 2 reads \\
-V3 & 3.5 $\mu$s & 11 $\mu$s & 3$\times$ & DATAFLOW: 3 ports \\
+V2 & 10.3 $\mu$s & 15 $\mu$s & -- \\
+V3 & 3.5 $\mu$s & 11 $\mu$s & \textbf{5 $\mu$s} \\
 \end{tabular}
 
-\vspace{3mm}
-
-{\color{successGreen}\faLightbulb}\hspace{2mm}\textbf{Optimization Path:} Map each AXI bundle to separate DDR banks via \texttt{connectivity.cfg} to eliminate contention and achieve theoretical performance.
-\end{warningbox}
+\vspace{2mm}
+{\small\textcolor{textMuted}{\faLightbulb\hspace{1mm}V3's transfer rate doubled from 8868 MB/s to 18886 MB/s with multi-bank mapping.}}
+\end{solutionbox}
 
 \vspace{3mm}
 \noindent\textcolor{textMuted}{\faBook\hspace{2mm}\textbf{Reference:}} For more details on interpreting the Vitis profile summary, see the official AMD documentation: \href{https://docs.amd.com/r/2022.1-English/ug1393-vitis-application-acceleration/Interpreting-the-Profile-Summary}{Interpreting the Profile Summary}.
+
 
 \end{document}
