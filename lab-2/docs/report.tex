@@ -39,6 +39,7 @@
 \definecolor{purpleAccent}{RGB}{139,92,246}     % Purple
 \definecolor{lightBlueBg}{RGB}{239,246,255}     % Light blue bg
 \definecolor{lightTealBg}{RGB}{240,253,250}     % Light teal bg
+\definecolor{lightOrangeBg}{RGB}{255,247,237}   % Light orange bg
 \definecolor{lightPurpleBg}{RGB}{250,245,255}   % Light purple bg
 \definecolor{codeGray}{RGB}{249,250,251}        % Code background
 \definecolor{borderGray}{RGB}{226,232,240}      % Border color
@@ -869,55 +870,202 @@ $$ \text{Speedup} = \frac{\text{Latency}_{V1}}{\text{Latency}_{V3}} = \frac{6763
 $$ \text{Speedup} = \frac{\text{Latency}_{V2}}{\text{Latency}_{V3}} = \frac{3104}{1048} \approx \mathbf{2.96 \times} $$
 \end{solutionbox}
 
-
 \subsection{Theoretical vs. Actual Performance Analysis}
 
+% ---------------------------------------------------------------------------
+% V3 ANALYSIS (Compute-Bound vs Memory-Bound)
+% ---------------------------------------------------------------------------
+
 \begin{solutionbox}
-{\color{accentBlue}\faInfoCircle}\hspace{2mm}\textbf{The Discrepancy: Port Parallelism vs. Memory Bandwidth}
+{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{V3 Performance Discrepancy: Compute-Bound vs Memory-Bound}
 
-Although the code defines separate AXI bundles (\texttt{gmemA}, \texttt{gmemB}, \texttt{gmemC}) to create independent ports on the FPGA, the default system configuration maps all these ports to a \textbf{single shared DDR memory bank}.
+\vspace{2mm}
 
-This creates a classic "Many-to-One" bottleneck:
+\begin{tabular}{@{}lr@{}}
+\textbf{HLS Latency:} & $\sim$1,050 cycles \\
+\textbf{FPGA Frequency:} & 300 MHz \\
+\textbf{Theoretical Time:} & $1050 \div 300\text{ MHz} \approx \mathbf{3.5~\mu s}$ \\
+\textbf{Measured Time:} & $\mathbf{11~\mu s}$ \\
+\textbf{Discrepancy:} & $\sim$3$\times$ slower than expected \\
+\end{tabular}
 
-\begin{itemize}[label=\textcolor{dangerRed}{\faExclamationTriangle}, leftmargin=5mm, itemsep=2mm]
-    \item \textbf{FPGA Demand:} The V3 kernel attempts to Read A, Read B, and Write C simultaneously. At 300 MHz with 512-bit width, the requested aggregate bandwidth is:
-    $$ \text{BW per stream} = \frac{512 \text{ bits}}{8} \times 300 \text{ MHz} = 64 \text{ B} \times 300 \text{ M/s} = 19.2 \text{ GB/s} $$
-    $$ \text{Total Demand} = 3 \text{ streams} \times 19.2 \text{ GB/s} \approx \mathbf{57.6 \text{ GB/s}} $$
-    
-    \item \textbf{Memory Supply:} A single DDR4 channel (typical in emulation and default hardware mapping) has a peak theoretical bandwidth of only $\approx \mathbf{19.2 \text{ GB/s}}$.
+\vspace{3mm}
+
+{\color{dangerRed}\faBolt}\hspace{2mm}\textbf{Root Cause: Memory Bandwidth Bottleneck}
+
+\vspace{2mm}
+
+The V3 kernel is \textbf{memory-bound}, not compute-bound. The discrepancy arises because the kernel's memory demands exceed what a single DDR bank can provide.
+\end{solutionbox}
+
+\begin{solutionbox}
+{\color{accentBlue}\faMemory}\hspace{2mm}\textbf{Alveo U200 Memory Specifications}
+
+\vspace{2mm}
+
+\begin{tabular}{@{}ll@{}}
+\textbf{Memory Type:} & DDR4 \\
+\textbf{Configuration:} & 4 banks $\times$ 16 GB (64 GB Total) \\
+\textbf{Max Data Rate:} & 2400 MT/s (MegaTransfers/second) \\
+\textbf{Total Bandwidth (All 4 Banks):} & 77 GB/s \\
+\end{tabular}
+
+\vspace{2mm}
+
+\textbf{Peak Rate Per Channel:}
+$$ \text{Bandwidth} = 2400~\text{MT/s} \times 8~\text{bytes} = 19,200~\text{MB/s} = \mathbf{19.2~\text{GB/s}} $$
+
+{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Source: \href{https://docs.amd.com/r/en-US/ds962-u200-u250/Alveo-Product-Details}{AMD Alveo U200 Data Sheet (DS962)}}}
+\end{solutionbox}
+
+\begin{solutionbox}
+{\color{purpleAccent}\faCalculator}\hspace{2mm}\textbf{Kernel Bandwidth Demand vs. Hardware Supply}
+
+\vspace{2mm}
+
+\textbf{V3 Architecture Demand:}
+
+With \texttt{\#pragma HLS DATAFLOW}, all three stages execute \textbf{simultaneously}:
+\begin{itemize}[label=\textcolor{accentBlue}{\faAngleRight}, leftmargin=5mm, itemsep=1mm]
+    \item \texttt{compute\_diff\_wide}: Reading from \texttt{gmemA} (Image A)
+    \item \texttt{compute\_diff\_wide}: Reading from \texttt{gmemB} (Image B)
+    \item \texttt{write\_result\_wide}: Writing to \texttt{gmemC} (Image C)
 \end{itemize}
 
-\vspace{2mm}
-\textbf{The Resulting Slowdown:}
-Since the memory controller cannot serve 57.6 GB/s, it throttles the kernel. The effective execution time becomes determined by the memory limit, not the compute logic:
-
-$$ \text{Actual Time} \approx \text{Ideal Compute Time} \times \frac{\text{Demand}}{\text{Supply}} $$
-$$ 11 \mu s \approx 3.5 \mu s \times 3 $$
-
-{\small\textcolor{textMuted}{\faInfoCircle\hspace{2mm}Note: This 3$\times$ ratio is a first-order approximation. Actual performance may vary slightly due to memory arbitration overhead, burst scheduling inefficiencies, and controller latency.}}
+Each AXI port is 512-bits wide. At 300 MHz:
+$$ \text{Bandwidth per port} = \frac{512~\text{bits}}{8} \times 300~\text{MHz} = \mathbf{19.2~\text{GB/s}} $$
 
 \vspace{2mm}
-This confirms that while \texttt{accelerated\_v3} is logically capable of 3.5 $\mu$s execution, it is strictly \textbf{memory bound} in this system configuration. To realize the full potential of V3, one would need to map \texttt{gmemA}, \texttt{gmemB}, and \texttt{gmemC} to separate physical DDR banks (e.g., DDR[0], DDR[1], DDR[2]) using a connectivity configuration file.
+\textbf{Total Demand:}
+$$ 3~\text{ports} \times 19.2~\text{GB/s} = \mathbf{57.6~\text{GB/s}} $$
+
+\vspace{3mm}
+{\color{dangerRed}\faExclamationCircle}\hspace{2mm}\textbf{Hardware Supply:} In the default configuration, all three AXI bundles (\texttt{gmemA}, \texttt{gmemB}, \texttt{gmemC}) are mapped to a \textbf{single DDR bank}.
+
+\vspace{2mm}
+\textbf{The ``Traffic Jam'' Result:}
+$$ \text{Ratio} = \frac{\text{Demand}}{\text{Supply}} = \frac{57.6~\text{GB/s}}{19.2~\text{GB/s}} = \mathbf{3\times} $$
+$$ \text{Actual Time} = 3.5~\mu s \times 3 \approx \mathbf{10.5~\mu s} $$
+
+This aligns closely with the observed \textbf{11 $\mu$s} execution time.
 \end{solutionbox}
+
+\begin{tipbox}
+{\color{successGreen}\faLightbulb}\hspace{2mm}\textbf{Optimization Path:}
+
+\vspace{2mm}
+
+To achieve the theoretical $\sim$3.5 $\mu$s execution time on real hardware, map each AXI bundle to a \textbf{separate physical DDR bank}:
+
+\vspace{2mm}
+
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+# connectivity.cfg
+[connectivity]
+sp=IMAGE_DIFF_POSTERIZE.gmemA:DDR[0]
+sp=IMAGE_DIFF_POSTERIZE.gmemB:DDR[1]
+sp=IMAGE_DIFF_POSTERIZE.gmemC:DDR[2]
+\end{lstlisting}
+
+\vspace{2mm}
+This eliminates memory contention by providing 3 $\times$ 19.2 GB/s = 57.6 GB/s of parallel bandwidth, matching the kernel's demand.
+\end{tipbox}
+
+% ---------------------------------------------------------------------------
+% V2 ANALYSIS (The Partial Bottleneck)
+% ---------------------------------------------------------------------------
+
+\begin{solutionbox}
+{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{V2 Performance Analysis: The Partial Bottleneck}
+
+\vspace{2mm}
+V2 also exhibits a performance gap, despite its sequential nature:
+
+\begin{tabular}{@{}lr@{}}
+\textbf{Theoretical Time:} & $3104 \div 300\text{ MHz} \approx \mathbf{10.3~\mu s}$ \\
+\textbf{Measured Time:} & $\mathbf{15~\mu s}$ \\
+\end{tabular}
+
+\vspace{2mm}
+\textbf{Why the 50\% slowdown?}
+While the stages run sequentially, \textbf{Stage 1} still requires double the available bandwidth:
+
+\begin{enumerate}[label=\textcolor{accentBlue}{\arabic*.}, leftmargin=6mm, itemsep=1mm]
+    \item \textbf{Stage 1 (Difference \& Posterize):} Reads A and B simultaneously.
+    \begin{itemize}[label=$\rightarrow$]
+        \item Demand (38.4 GB/s) $>$ Supply (19.2 GB/s).
+        \item \textbf{Result:} Throttled by \textbf{2x} ($3.4~\mu s \rightarrow \mathbf{6.8~\mu s}$).
+    \end{itemize}
+    
+    \item \textbf{Stage 2 (Filter):} Reads/Writes local BRAM only.
+    \begin{itemize}[label=$\rightarrow$]
+        \item No DDR access. \textbf{Result:} Full speed ($\mathbf{3.5~\mu s}$).
+    \end{itemize}
+    
+    \item \textbf{Stage 3 (Memory Write):} Writes C only.
+    \begin{itemize}[label=$\rightarrow$]
+        \item Demand equals Supply (19.2 GB/s). \textbf{Result:} Full speed ($\mathbf{3.4~\mu s}$).
+    \end{itemize}
+\end{enumerate}
+
+\end{solutionbox}
+
+
+\begin{solutionbox}
+{\color{secondaryTeal}\faCalculator}\hspace{2mm}\textbf{Final Calculation}
+
+\vspace{2mm}
+
+Adding up the actual time for all sequential stages:
+
+$$ \text{Total Time} = \underbrace{6.8~\mu s}_{\text{Stage 1 (Throttled)}} + \underbrace{3.5~\mu s}_{\text{Stage 2}} + \underbrace{3.4~\mu s}_{\text{Stage 3}} = \mathbf{13.7~\mu s} $$
+
+\vspace{2mm}
+
+The calculated 13.7 $\mu$s is very close to the measured \textbf{15 $\mu$s}. The remaining $\sim$1.3 $\mu$s accounts for kernel launch overhead and pipeline flushing.
+
+\vspace{3mm}
+
+{\color{accentBlue}\faLightbulb}\hspace{2mm}\textbf{Key Insight:} V2 is $\sim$1.5$\times$ slower because \textit{only Stage 1} tries to do 2 things at once (Read A + Read B), while the other stages operate within bandwidth limits.
+\end{solutionbox}
+
 
 \section{Conclusion}
 
 \begin{tcolorbox}[mybox]
-\faFlagCheckered\hspace{2mm}This laboratory exercise explored three architectural approaches for implementing an image processing accelerator with difference, posterization, and sharpening operations:
+\faFlagCheckered\hspace{2mm}This laboratory exercise explored three architectural approaches for implementing an image processing accelerator with difference, posterization, and sharpening:
 
-\begin{itemize}[leftmargin=5mm, itemsep=3mm]
-    \item \textbf{V1 (Sequential + 2D Buffers):} Simplest implementation with straightforward 2D array access for the filter stage. Trades off memory for simplicity.
+\begin{itemize}[leftmargin=5mm, itemsep=2mm]
+    \item \textbf{V1 (Sequential + 2D Buffers):} Simplest implementation with pixel-by-pixel filter access. The 1-pixel/cycle filter stage creates a \textbf{97\% bottleneck}, resulting in 230 $\mu$s execution time.
     
-    \item \textbf{V2 (Sequential + Line Buffers):} More memory-efficient filter implementation using sliding window on 512-bit chunks, but still sequential execution.
+    \item \textbf{V2 (Sequential + Line Buffers):} Achieves 64 pixels/cycle in all stages via sliding window. However, Stage 1's simultaneous A/B reads cause \textbf{2$\times$ memory contention}, inflating execution from theoretical 10.3 $\mu$s to 15 $\mu$s.
     
-    \item \textbf{V3 (Dataflow + Streams):} Achieves maximum performance through pipeline parallelism with HLS streams. All stages execute concurrently, approaching theoretical minimum latency.
+    \item \textbf{V3 (Dataflow + Streams):} Maximum parallelism with concurrent stage execution. All 3 AXI ports active simultaneously create \textbf{3$\times$ memory contention}, limiting performance to 11 $\mu$s instead of theoretical 3.5 $\mu$s.
 \end{itemize}
-
-\vspace{3mm}
-\textcolor{textMuted}{\faLightbulb}\hspace{2mm}\textit{The results demonstrate the trade-offs between implementation complexity, resource utilization, and performance. The dataflow architecture (V3) provides the best performance but requires careful design of stream depths and stage balancing.}
 \end{tcolorbox}
 
-\vspace{5mm}
+\begin{warningbox}
+{\color{warningOrange}\faExclamationTriangle}\hspace{2mm}\textbf{Key Finding: Memory-Bound Performance}
+
+\vspace{2mm}
+
+Both V2 and V3 are \textbf{memory-bound}, not compute-bound. Despite achieving near-optimal HLS latencies, actual execution times are limited by DDR bandwidth when multiple AXI ports share a single memory bank
+
+\vspace{2mm}
+
+\begin{tabular}{@{}lcccc@{}}
+\textbf{Version} & \textbf{Theoretical} & \textbf{Measured} & \textbf{Bottleneck} & \textbf{Cause} \\
+\midrule
+V2 & 10.3 $\mu$s & 15 $\mu$s & 1.5$\times$ & Stage 1: 2 reads \\
+V3 & 3.5 $\mu$s & 11 $\mu$s & 3$\times$ & DATAFLOW: 3 ports \\
+\end{tabular}
+
+\vspace{3mm}
+
+{\color{successGreen}\faLightbulb}\hspace{2mm}\textbf{Optimization Path:} Map each AXI bundle to separate DDR banks via \texttt{connectivity.cfg} to eliminate contention and achieve theoretical performance.
+\end{warningbox}
+
+\vspace{3mm}
 \noindent\textcolor{textMuted}{\faBook\hspace{2mm}\textbf{Reference:}} For more details on interpreting the Vitis profile summary, see the official AMD documentation: \href{https://docs.amd.com/r/2022.1-English/ug1393-vitis-application-acceleration/Interpreting-the-Profile-Summary}{Interpreting the Profile Summary}.
 
 \end{document}
