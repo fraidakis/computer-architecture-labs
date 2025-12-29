@@ -14,7 +14,6 @@
  * - 512-bit wide AXI interfaces (64 pixels per memory transaction)
  * - Full-width parallelism (64 pixels processed simultaneously)
  * - Sequential stage execution (stages do NOT overlap)
- * - Local BRAM buffers for intermediate storage
  *
  * ============================================================================
  * MEMORY ACCESS PATTERN

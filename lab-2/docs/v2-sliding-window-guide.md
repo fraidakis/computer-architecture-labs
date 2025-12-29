@@ -108,11 +108,11 @@ Instead of storing individual pixels, V2 stores **512-bit chunks**. For a 256-pi
 
 ```
           ┌───────────────────────────────────────────────────┐
-Row r-2:  │ lb[0][0]   lb[0][1]   lb[0][2]   lb[0][3]    │  ← Oldest row (4 chunks)
+Row r-2:  │ lb[0][0]   lb[0][1]   lb[0][2]   lb[0][3]         │  ← Oldest row (4 chunks)
           ├───────────────────────────────────────────────────┤
-Row r-1:  │ lb[1][0]   lb[1][1]   lb[1][2]   lb[1][3]    │  ← Previous row
+Row r-1:  │ lb[1][0]   lb[1][1]   lb[1][2]   lb[1][3]         │  ← Previous row
           ├───────────────────────────────────────────────────┤
-Row r:    │            (incoming chunks)                   │  ← Current row
+Row r:    │            (incoming chunks)                      │  ← Current row
           └───────────────────────────────────────────────────┘
 ```
 
@@ -334,14 +334,14 @@ Since filter computation requires vertical neighbors, you must store the last tw
 ```
                     Chunk-Level Line Buffers Storage
      ┌─────────────────────────────────────────────────┐
-     │  lb[0][c] = 512-bit chunk from 2 rows ago        │
-     │  lb[1][c] = 512-bit chunk from 1 row ago         │
+     │  lb[0][c] = 512-bit chunk from 2 rows ago       │
+     │  lb[1][c] = 512-bit chunk from 1 row ago        │
      └─────────────────────────────────────────────────┘
                             │
                             ▼
      ┌─────────────────────────────────────────────────┐
-     │         3×3 Sliding Window of Chunks             │
-     │  win[row][col] = 9 chunks (576 pixels total)     │
+     │         3×3 Sliding Window of Chunks            │
+     │  win[row][col] = 9 chunks (576 pixels total)    │
      └─────────────────────────────────────────────────┘
 ```
 
@@ -1084,7 +1084,3 @@ row 3  │   0   │      0      │      0      │   0   │  ← Bottom borde
 > - Border pixels are zeroed because the filter would need neighbors outside the image
 
 ---
-
-*Consolidated document for accelerated_v2.cpp — V2 Chunk-Level Sliding Window Architecture*
-
-> For **V3 Dataflow Streaming** architecture with HLS streams and overlapped execution, see [versions.md](versions.md).

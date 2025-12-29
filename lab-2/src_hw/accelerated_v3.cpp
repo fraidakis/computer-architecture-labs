@@ -1,12 +1,12 @@
 /**
 * @file accelerated_v3.cpp
-* @brief V3 (Ultra-Optimized) HW-accelerated image difference + posterization + sharpen.
+* @brief V3 - HW-accelerated image difference + posterization + sharpen.
 *
 * Optimization Strategy: FULL WIDTH PARALLELISM (64 pixels/cycle).
 *
 * Performance:
 * - Throughput: 64 pixels per clock cycle.
-* - Latency: ~1,050 cycles (Theoretical min for 256x256 is 1024 cycles).
+* - Latency: Theoretical min for 256x256 is 1024 cycles (256*256/64).
 *
 * Architecture:
 * - Streams are 512-bit wide (uint512_t).
