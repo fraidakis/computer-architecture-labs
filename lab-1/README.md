@@ -223,23 +223,11 @@ Total Pixels:       65536
    - Enables concurrent memory access
    - Optimizes memory bandwidth utilization
 
-## 📚 References
+## 📚 Documentation
 
-- [Xilinx UG1399: Vitis HLS User Guide](https://www.xilinx.com/support/documentation/sw_manuals/xilinx2021_1/ug1399-vitis-hls.pdf)
-- [AXI4 Specification](https://developer.arm.com/documentation/ihi0022/e/)
-- Assignment specification: `docs/assigment-description-lab-1.pdf`
-
-## 🎓 Learning Outcomes
-
-After completing this lab, you should be able to:
-
-- ✅ Implement image processing algorithms in C/C++
-- ✅ Apply HLS optimization directives effectively
-- ✅ Design memory-mapped AXI interfaces
-- ✅ Analyze synthesis reports and identify bottlenecks
-- ✅ Compare software vs hardware implementations
-- ✅ Calculate theoretical speedups and resource utilization
+- 📄 [Assignment Specification](docs/assigment-description-lab-1.pdf) - Original lab requirements
+- 📝 [Detailed Report](docs/report.pdf) - Full technical analysis and results
 
 ---
 
-**Next Steps**: Proceed to [Lab 2](../lab-2/) for more advanced hardware acceleration techniques.
+**Next Steps**: Proceed to [Lab 2](../lab-2/) to deploy on Vitis IDE.

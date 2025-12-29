@@ -128,4 +128,11 @@ lab-2/
 
 ---
 
-**Previous**: [Lab 1](../lab-1/)
+## 📚 Documentation
+
+- 📄 [Assignment Specification](docs/assigment-description-lab-2-en.pdf.pdf) - Original lab requirements
+- 📝 [Detailed Report](docs/report.pdf) - Full technical analysis and results
+
+---
+
+**Previous**: [Lab 1](../lab-1/) - Image Processing with Vitis HLS
