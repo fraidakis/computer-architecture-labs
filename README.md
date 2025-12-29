@@ -10,9 +10,8 @@ This repository contains laboratory assignments for a Computer Architecture cour
 
 ```
 computer-architecture-labs/
-├── lab-1/          # Image Processing with HLS
-├── lab-2/          # [To be added]
-├── lab-3/          # [To be added]
+├── lab-1/          # Image Processing with Vitis HLS
+├── lab-2/          # Image Processing Accelerator with Vitis IDE
 └── README.md       # This file
 ```
 
@@ -29,9 +28,9 @@ Each lab is self-contained with its own documentation, source code, and build in
 
 ## Labs Overview
 
-### Lab 1: Image Difference with Hardware Acceleration
+### Lab 1: Image Difference with Hardware Acceleration (Vitis HLS)
 
-Implements a posterized image difference algorithm with both baseline (software) and accelerated (FPGA) versions using Xilinx HLS.
+Implements a posterized image difference algorithm with both baseline (software) and accelerated (FPGA) versions using **Xilinx Vitis HLS** for high-level synthesis.
 
 **Key Concepts:**
 - Pixel-wise absolute difference
@@ -41,13 +40,17 @@ Implements a posterized image difference algorithm with both baseline (software)
 
 [→ Go to Lab 1](./lab-1/)
 
-### Lab 2: [Coming Soon]
+### Lab 2: Image Processing Accelerator with Sharpening Filter (Vitis IDE)
 
-*Lab 2 content will be added here*
+Extends Lab 1 by adding a 3×3 Laplacian-based sharpening filter to the image processing pipeline. Implements three HLS architectural variants using **Xilinx Vitis Unified IDE** for hardware emulation and deployment.
 
-### Lab 3: [Coming Soon]
+**Key Concepts:**
+- Three-stage processing: Difference → Posterization → Sharpen Filter
+- Line buffer and sliding window optimization
+- HLS Dataflow streaming architecture
+- AXI burst transfers with 512-bit memory interfaces
 
-*Lab 3 content will be added here*
+[→ Go to Lab 2](./lab-2/)
 
 ## Development Setup
 
