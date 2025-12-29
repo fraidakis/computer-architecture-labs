@@ -1,8 +1,22 @@
-# Lab 2: Image Processing Accelerator with Sharpening Filter
+<p align="center">
+  <h1 align="center">Lab 2: Image Processing Accelerator with Sharpening Filter</h1>
+  <p align="center">
+    <strong>Multi-Stage HLS Pipeline with Dataflow Streaming</strong>
+  </p>
+</p>
 
-**Author:** Fraidakis Ioannis  
-**Institution:** Aristotle University of Thessaloniki  
-**Date:** December 2025
+<p align="center">
+  <img src="https://img.shields.io/badge/Tool-Vitis%20IDE-FF6C00?style=flat-square&logo=xilinx&logoColor=white" alt="Vitis IDE">
+  <img src="https://img.shields.io/badge/Architecture-Dataflow-4CAF50?style=flat-square" alt="Dataflow">
+  <img src="https://img.shields.io/badge/Interface-512--bit%20AXI-2196F3?style=flat-square" alt="512-bit AXI">
+  <img src="https://img.shields.io/badge/Speedup-64×-E91E63?style=flat-square" alt="Speedup">
+</p>
+
+<p align="center">
+  <strong>Author:</strong> Fraidakis Ioannis<br>
+  <strong>Institution:</strong> Aristotle University of Thessaloniki<br>
+  <strong>Date:</strong> December 2025
+</p>
 
 ---
 
@@ -14,125 +28,207 @@ This lab extends the previous work by adding a **3×3 Laplacian-based sharpening
 2. **Posterization**: Map D to discrete levels (0, 128, or 255)
 3. **Sharpen Filter**: Apply a 3×3 Laplacian convolution kernel
 
-Three architectural implementations (V1, V2, V3) explore optimization strategies for throughput and resource utilization.
+Three architectural implementations (**V1**, **V2**, **V3**) explore optimization strategies for throughput and resource utilization.
 
 ---
 
-## 🎯 Objectives
-
-- Implement FPGA-based image processing with convolution filters
-- Compare sequential vs dataflow streaming architectures
-- Analyze HLS optimization pragmas (PIPELINE, DATAFLOW, ARRAY_PARTITION)
-- Understand memory bandwidth bottlenecks and burst transfers
-
----
-
-## 📁 Directory Structure
+## Directory Structure
 
 ```
 lab-2/
-├── docs/                    # Documentation
-│   ├── report.tex           # Detailed technical report (LaTeX)
-│   ├── report.pdf           # Compiled report
-│   └── assets/              # Images and figures
-├── inc/                     # Header files
-├── src_hw/                  # Hardware accelerator implementations
-│   ├── accelerated_v1.cpp   # V1: Sequential with 2D buffers
-│   ├── accelerated_v2.cpp   # V2: Sequential with line buffers
-│   └── accelerated_v3.cpp   # V3: Dataflow streaming
-├── src_sw/                  # Software components
-│   ├── host.cpp             # OpenCL host application
-│   ├── hls_tb.cpp           # HLS testbench
-│   └── xcl2.*               # Xilinx OpenCL utilities
-└── README.md                # This file
+├── docs/                          # Documentation
+│   ├── assigment-description.pdf  # Assignment specification
+│   ├── vitis-ide-tutorial.pdf     # Vitis IDE step-by-step guide
+│   ├── report.tex                 # Detailed technical report (LaTeX)
+│   ├── report.pdf                 # Compiled report
+│   └── assets/                    # Images and figures
+├── inc/                           # Header files
+├── src_hw/                        # Hardware accelerator implementations
+│   ├── accelerated_v1.cpp         # V1: Sequential with 2D buffers
+│   ├── accelerated_v2.cpp         # V2: Sequential with line buffers
+│   └── accelerated_v3.cpp         # V3: Dataflow streaming
+├── src_sw/                        # Software components
+│   ├── host.cpp                   # OpenCL host application
+│   ├── hls_tb.cpp                 # HLS testbench
+│   ├── event_timer.*              # Timing utility 
+│   └── xcl2.*                     # Xilinx OpenCL utilities
+└── README.md                      # This file
 ```
 
 ---
 
-## 🔧 Implementation Versions
+## Implementation Versions
 
-### Version 1: Sequential Three-Stage Pipeline
-- **File:** `src_hw/accelerated_v1.cpp`
-- Uses 2D local BRAM buffers with full-frame buffering
-- Filter stage processes **1 pixel/cycle** (bottleneck)
-- HLS Latency: ~67,632 cycles
+<table>
+<tr>
+<th width="33%">🔵 Version 1</th>
+<th width="33%">🟢 Version 2</th>
+<th width="33%">🟣 Version 3</th>
+</tr>
+<tr>
+<td>
 
-### Version 2: Sequential with Line Buffers  
-- **File:** `src_hw/accelerated_v2.cpp`
-- Sliding window approach with line buffers
-- All stages process **64 pixels/cycle**
-- HLS Latency: ~3,104 cycles (**21× faster** than V1)
+### Sequential Pipeline
 
-### Version 3: Dataflow Streaming Architecture
-- **File:** `src_hw/accelerated_v3.cpp`
-- `#pragma HLS DATAFLOW` for concurrent stage execution
-- Stages connected via `hls::stream<uint512_t>`
-- HLS Latency: ~1,049 cycles (**64× faster** than V1)
+**File:** `accelerated_v1.cpp`
+
+- 2D local BRAM buffers
+- Full-frame buffering
+- **1 pixel/cycle** (bottleneck)
+- Latency: ~67,632 cycles
+
+</td>
+<td>
+
+### Line Buffers
+
+**File:** `accelerated_v2.cpp`
+
+- Sliding window approach
+- Line buffer optimization
+- **64 pixels/cycle**
+- Latency: ~3,104 cycles
+
+</td>
+<td>
+
+### Dataflow Streaming
+
+**File:** `accelerated_v3.cpp`
+
+- `#pragma HLS DATAFLOW`
+- `hls::stream<uint512_t>`
+- **64 pixels/cycle**
+- Latency: ~1,049 cycles
+
+</td>
+</tr>
+<tr>
+<td align="center">⏱️ Baseline</td>
+<td align="center">⚡ <strong>21× faster</strong></td>
+<td align="center">🚀 <strong>64× faster</strong></td>
+</tr>
+</table>
 
 ---
 
 ## 📊 Performance Summary
 
-| Metric              | V1        | V2        | V3        |
-|---------------------|-----------|-----------|-----------|
-| HLS Latency (cycles)| 67,632    | 3,104     | 1,049     |
-| CU Time (µs @ 300MHz)| 230      | 15        | 5         |
-| BRAM_18K            | 256       | 30        | 0         |
-| Throughput          | 1 px/cyc  | 64 px/cyc | 64 px/cyc |
+| Metric                    |    V1     |    V2     |      V3       |
+|---------------------------|:---------:|:---------:|:-------------:|
+| **HLS Latency** (cycles)  |  67,632   |   3,104   |   **1,049**   |
+| **CU Time** (µs @ 300MHz) |    230    |     15    |     **5**     |
+| **BRAM_18K**              |    256    |     30    |     **0**     |
+| **Throughput**            | 1 px/cyc  | 64 px/cyc | **64 px/cyc** |
+
+> 💡 **V3** achieves the best performance through concurrent stage execution with dataflow streaming.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
+
+> 📘 **New to Vitis IDE?** Follow this comprehensive [Vitis IDE Tutorial](docs/vitis-ide-tutorial.pdf) for detailed step-by-step instructions.
 
 ### Prerequisites
 
-- Xilinx Vitis HLS
-- Xilinx Vitis Unified IDE
-- Alveo U200 or compatible FPGA board (for hardware execution)
+| Tool | Purpose |
+|------|---------|
+| **Xilinx Vitis HLS** | HLS synthesis and simulation |
+| **Xilinx Vitis  IDE** | Hardware emulation and deployment |
+| **Alveo U200** (or compatible) | FPGA execution target |
 
-### Building & Running
+### Step-by-Step Guide
 
-1. **Launch Vitis IDE:**
-   - Open Vitis IDE (write `vitis` in the terminal)
-   - Select a workspace directory
+#### 1️⃣ Launch Vitis IDE
 
-2. **Create New Application Project:**
-   - Click **File → New → Application Project**
-   - Configure project name and platform (eg `lab-2` and `Alveo U200`)
+```bash
+vitis    # Opens Vitis Unified IDE
+```
 
-3. **Add Host Files:**
-   - Navigate to `host/src` in your project
-   - Add all files from `src_sw/`:
-     - `host.cpp` (main host application)
-     - `xcl2.cpp` and `xcl2.hpp` (OpenCL utilities)
-     - `event_timer.cpp` and `event_timer.hpp`
+Select a workspace directory when prompted.
 
-4. **Add Kernel Files:**
-   - Navigate to `kernel/src` in your project
-   - Add your chosen accelerator version from `src_hw/`:
-     - `accelerated_v1.cpp` (Sequential with 2D buffers)
-     - `accelerated_v2.cpp` (Line buffers) 
-     - `accelerated_v3.cpp` (Dataflow streaming)
+#### 2️⃣ Create New Application Project
 
-5. **Configure Kernel:**
-   - Open the `.prj` file of kernel directory
-   - Set the accelerated kernel configuration
-   - Ensure top function is `IMAGE_DIFF_POSTERIZE`
+1. **File → New → Application Project**
+2. Configure:
+   - **Project name:** `lab-2`
+   - **Platform:** Alveo U200 (or your target)
 
-6. **Build and Run:**
-   - Select **Emulation-HW** as target
-   - Click **Build** to compile host and synthesize kernel
-   - Click **Run** to execute hardware emulation
+#### 3️⃣ Add Host Files
 
-> 📘 For more detailed step-by-step instructions, see the [Vitis IDE Tutorial](docs/vitis-ide-tutorial.pdf).
+Navigate to `host/src` in your project and add from `src_sw/`:
+
+| File | Description |
+|------|-------------|
+| `host.cpp` | Main host application |
+| `xcl2.cpp` + `xcl2.hpp` | OpenCL utilities |
+| `event_timer.cpp` + `event_timer.hpp` | Timing utilities |
+
+#### 4️⃣ Add Kernel Files
+
+Navigate to `kernel/src` and add your chosen version from `src_hw/`:
+
+| Option | File | Architecture |
+|:------:|------|--------------|
+| **A** | `accelerated_v1.cpp` | Sequential with 2D buffers |
+| **B** | `accelerated_v2.cpp` | Line buffers |
+| **C** | `accelerated_v3.cpp` | Dataflow streaming ⭐ |
+
+#### 5️⃣ Configure Kernel
+
+1. Open the `.prj` file of kernel directory
+2. Set top function: `IMAGE_DIFF_POSTERIZE`
+3. Configure kernel settings as needed
+
+#### 6️⃣ Build and Run
+
+| Step | Target | Action |
+|------|--------|--------|
+| 1 | **Emulation-HW** | Select as build target |
+| 2 | **Build** | Compile host + synthesize kernel |
+| 3 | **Run** | Execute hardware emulation |
+
+
+---
+
+## Architecture Comparison
+
+### V1: Full-Frame Buffering
+```
+[Read A,B] → [BRAM 2D] → [Diff] → [Poster] → [Filter 1px] → [Write]
+                                                  ↑
+                                             BOTTLENECK
+```
+
+### V2: Line Buffer + Sliding Window
+```
+[Read 64px] → [Line Buffer] → [Sliding Window] → [64px/cycle] → [Write]
+                                    ↓
+                              21× Improvement
+```
+
+### V3: Dataflow Streaming
+```
+┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│   Read Stage │═══│ Process Stage│═══│  Write Stage │
+│  (streaming) │   │  (parallel)  │   │  (streaming) │
+└──────────────┘   └──────────────┘   └──────────────┘
+         ↓                ↓                  ↓
+        CONCURRENT EXECUTION → 64× Improvement
+```
 
 ---
 
 ## 📚 Documentation
 
-- 📄 [Assignment Specification](docs/assigment-description-lab-2-en.pdf.pdf) - Original lab requirements
-- 📝 [Detailed Report](docs/report.pdf) - Full technical analysis and results
+| Document | Description |
+|----------|-------------|
+| 📄 [Assignment Specification](docs/assigment-description-lab-2-en.pdf.pdf) | Original lab requirements |
+| 📝 [Detailed Report](docs/report.pdf) | Full technical analysis and results |
 
 ---
 
-**Previous**: [Lab 1](../lab-1/) - Image Processing with Vitis HLS
+<p align="center">
+  ⬅️ <strong>Previous:</strong> <a href="../lab-1/">Lab 1</a> - Image Processing with Vitis HLS
+</p>
+

@@ -1,55 +1,87 @@
-# Lab 1: Image Difference with Hardware Acceleration
+<p align="center">
+  <h1 align="center">Lab 1: Image Difference with Hardware Acceleration</h1>
+  <p align="center">
+    <strong>Posterized Image Difference Algorithm using Xilinx Vitis HLS</strong>
+  </p>
+</p>
 
-This lab implements a hardware-accelerated image difference algorithm with posterization using Xilinx High-Level Synthesis (HLS).
+<p align="center">
+  <img src="https://img.shields.io/badge/Tool-Vitis%20HLS-FF6C00?style=flat-square&logo=xilinx&logoColor=white" alt="Vitis HLS">
+  <img src="https://img.shields.io/badge/Language-C%2FC%2B%2B-00599C?style=flat-square&logo=c%2B%2B&logoColor=white" alt="C/C++">
+  <img src="https://img.shields.io/badge/Interface-AXI-2196F3?style=flat-square" alt="AXI">
+  <img src="https://img.shields.io/badge/Parallelism-64%20px%2Fcycle-4CAF50?style=flat-square" alt="Parallelism">
+</p>
+
+---
 
 ## 📋 Overview
 
-The project compares two grayscale images and produces a posterized difference visualization with three levels:
-- **Black (0)**: Minimal difference (< 32)
-- **Gray (128)**: Moderate difference (32-95)
-- **White (255)**: Significant difference (≥ 96)
+This lab implements a hardware-accelerated **image difference algorithm** that compares two grayscale images and produces a posterized difference visualization with three levels:
 
-## 🎯 Objectives
+| Difference Value | Output | Visual |
+|:---------------:|:------:|:------:|
+| D < 32 | **0** | ⬛ Black |
+| 32 ≤ D < 96 | **128** | 🔲 Gray |
+| D ≥ 96 | **255** | ⬜ White |
 
-1. Understand pixel-wise image operations
-2. Learn HLS optimization techniques for FPGA acceleration
-3. Implement memory-mapped AXI interfaces
-4. Optimize for throughput using pipelining and unrolling
+---
 
 ## 📁 Directory Structure
 
 ```
 lab-1/
 ├── docs/
-│   └── assigment-description-lab-1.pdf    # Assignment specification
-├── inc/
-│   └── image_defines.h                     # Common definitions and types
-├── src/
-│   ├── image_diff_baseline.c               # Software baseline implementation
-│   ├── image_diff_accelarated.cpp          # HLS-optimized FPGA implementation
-│   └── tb_image_diff.c                     # Testbench for verification
-└── README.md                               # This file
+│   ├── assigment-description-lab-1.pdf  # Assignment specification
+│   └── report.pdf                       # Technical report
+├── i
+│   └── image_defines.h                  # Common definitions and types
+├── s
+│   ├── image_diff_baseline.c            # Software baseline implementation
+│   ├── image_diff_accelarated.cpp       # HLS-optimized FPGA implementation
+│   └── tb_image_diff.c                  # Testbench for verification
+└── README.md                            # This file
 ```
 
-## 🔧 Implementation Details
+---
+
+## Implementation Details
 
 ### Key Components
 
-#### 1. **Baseline Implementation** (`image_diff_baseline.c`)
-- Pure C implementation for reference
-- Sequential processing of all pixels
-- Used for correctness verification
+<table>
+<tr>
+<td width="33%">
 
-#### 2. **Accelerated Implementation** (`image_diff_accelarated.cpp`)
-- HLS-optimized for FPGA synthesis
-- Processes 64 pixels in parallel (512-bit data path)
-- Target: 1 cycle per 64-pixel chunk (II=1)
-- Uses AXI memory-mapped interfaces
+#### 1️⃣ Baseline
+**`image_diff_baseline.c`**
 
-#### 3. **Testbench** (`tb_image_diff.c`)
-- Generates random test images (256×256)
-- Compares HW vs SW implementations
-- Provides statistical analysis of results
+- Pure C implementation
+- Sequential pixel processing
+- Reference for verification
+
+</td>
+<td width="33%">
+
+#### 2️⃣ Accelerated
+**`image_diff_accelarated.cpp`**
+
+- HLS-optimized for FPGA
+- **64 pixels** in parallel
+- AXI memory interfaces
+
+</td>
+<td width="33%">
+
+#### 3️⃣ Testbench
+**`tb_image_diff.c`**
+
+- Random image generation
+- HW vs SW comparison
+- Statistical analysis
+
+</td>
+</tr>
+</table>
 
 ### Algorithm
 
@@ -62,132 +94,134 @@ For each pixel (i,j):
      - If D ≥ 96:     C[i,j] = 255    // White
 ```
 
-## 🏗️ Building the Project
+---
 
-### HLS Synthesis (Xilinx Vitis HLS)
+## Building with Vitis HLS
 
-1. **Launch Vitis HLS:**
-   - Open Vitis HLS application
-   - Select a workspace directory (can be anywhere)
+### Step 1: Create New Project
 
-2. **Create New Project:**
-   - Click **File → New Project**
+1. **Launch Vitis HLS** → Select workspace directory
+2. **File → New Project**
    - **Project name:** `image_diff_hls`
-   - **Location:** Browse to your `lab-1` directory
-   - Click **Next**
+   - **Location:** Your `lab-1` directory
+3. Click **Next**
 
-3. **Add Design Files:**
-   - Click **Add Files...**
-   - Select `src/image_diff_accelarated.cpp`
-   - **Top Function:** Enter `IMAGE_DIFF_POSTERIZE`
-   - Click **Next**
+### Step 2: Add Design Files
 
-4. **Add Testbench Files:**
-   - Click **Add Files...**
-   - Select `src/tb_image_diff.c`
-   - Click **Next**
+| Action | File | Setting |
+|--------|------|---------|
+| Add File | `src/image_diff_accelarated.cpp` | **Top Function:** `IMAGE_DIFF_POSTERIZE` |
 
-5. **Solution Configuration:**
-   - **Solution name:** `solution1`
-   - **Clock Period:** `10` (ns) → 100 MHz
-   - **Part Selection:**
-     - Click **...** button
-     - Search for your target device (e.g., `xcvu9p-flga2104-2-i`)
-     - Or select from boards/devices list
-   - Click **Finish**
+### Step 3: Add Testbench Files
 
-6. **Configure Include Paths:**
-   - Right-click on `image_diff_accelarated.cpp` in Explorer
-   - Select **Properties**
-   - Under **C/C++ Build → Settings**
-   - Add include path: `../inc` or absolute path to `inc` directory
-   - Repeat for testbench files
+| Action | File |
+|--------|------|
+| Add File | `src/tb_image_diff.c` |
 
-7. **Run C Simulation:**
-   - Click **Project → Run C Simulation**
-   - Or click the ▶️ **Run C Simulation** button in toolbar
-   - Verify output shows "Test Passed"
+### Step 4: Configure Solution
 
-8. **Run C Synthesis:**
-   - Click **Solution → Run C Synthesis → Active Solution**
-   - Or press **Ctrl+R** (Windows) / **Cmd+R** (Mac)
-   - Wait for synthesis to complete
-   - Review synthesis report (opens automatically)
+| Setting | Value |
+|---------|-------|
+| **Solution name** | `solution1` |
+| **Clock Period** | `10` ns (100 MHz) |
+| **Part** | Your target device (e.g., `xcvu9p-flga2104-2-i`) |
 
-9. **Run C/RTL Co-simulation:**
-   - Click **Solution → Run C/RTL Cosimulation**
-   - Select **RTL:** `Verilog` or `VHDL`
-   - Enable **Dump Trace:** `all` (optional, for waveform viewing)
-   - Click **OK**
+### Step 5: Configure Include Paths
 
-10. **Export RTL (Optional):**
-    - Click **Solution → Export RTL**
-    - Select format: **IP Catalog** or **System Generator**
-    - Click **OK**
+1. Right-click on source files → **Properties**
+2. Under **C/C++ Build → Settings**
+3. Add include path: `../inc`
 
-### Viewing Results in Vitis HLS GUI
+### Step 6: Run Simulation & Synthesis
 
-After synthesis completes, you can view various reports:
+| Step | Action | Shortcut |
+|------|--------|----------|
+| 1️⃣ | **Run C Simulation** | Verify "Test Passed" |
+| 2️⃣ | **Run C Synthesis** | `Ctrl+R` |
+| 3️⃣ | **Run C/RTL Co-simulation** | Optional |
+| 4️⃣ | **Export RTL** | IP Catalog format |
 
-1. **Synthesis Report:**
-   - Navigate to **Explorer** panel
-   - Expand **solution1 → syn → report**
-   - Double-click `IMAGE_DIFF_POSTERIZE_csynth.rpt`
-   - **Key Metrics:**
-     - **Timing:** Check if clock constraint is met
-     - **Latency:** Min/Max/Avg cycles to complete
-     - **Interval:** Throughput (cycles between function calls)
-     - **Loop Analysis:** Shows II achieved for each loop
+---
 
-2. **Resource Utilization:**
-   - In synthesis report, scroll to **Utilization Estimates**
-   - Shows: BRAM, DSP, FF (Flip-Flops), LUT usage
-   - Compare with available resources on target device
+## 📊 Viewing Results
 
-3. **Interface Summary:**
-   - Shows AXI interface details
-   - Memory bundles (gmemA, gmemB, gmemC)
-   - Control interface (s_axilite)
+### Synthesis Report Navigation
 
-4. **Schedule Viewer (Analysis Perspective):**
-   - Click **Perspective → Analysis** (top-right corner)
-   - Shows cycle-by-cycle execution schedule
-   - Visualizes pipeline behavior and data dependencies
+```
+solution1/
+└── syn/
+    └── report/
+        └── IMAGE_DIFF_POSTERIZE_csynth.rpt
+```
 
-5. **Waveform Viewer (After Co-simulation):**
-   - Double-click on `.wdb` file in **sim/verilog** folder
-   - Opens Vivado waveform viewer
-   - Inspect signal transitions and timing
+### Key Metrics to Check
 
-## 📊 Performance Characteristics
+| Metric | Description |
+|--------|-------------|
+| **Timing** | Clock constraint satisfaction |
+| **Latency** | Min/Max/Avg cycles |
+| **Interval** | Throughput (cycles between calls) |
+| **Loop Analysis** | II achieved for each loop |
 
-### Baseline (Software)
-- **Processing**: Sequential, 1 pixel per iteration
-- **Memory Access**: Random access pattern
-- **Target Platform**: CPU
+### Additional Views
 
-### Accelerated (Hardware)
-- **Processing**: 64 pixels per cycle
-- **Memory Access**: Burst transfers (512-bit wide)
-- **Pipeline II**: 1 (one chunk per cycle)
-- **Target Platform**: FPGA (Xilinx UltraScale+)
+- **Resource Utilization** - BRAM, DSP, FF, LUT usage
+- **Interface Summary** - AXI interface details
+- **Schedule Viewer** - Cycle-by-cycle execution (Analysis Perspective)
+- **Waveform Viewer** - Signal transitions (after co-simulation)
 
-### Expected Speedup
-For a 256×256 image (65,536 pixels):
-- **Baseline**: ~65,536 iterations
-- **Accelerated**: ~1,024 chunks (64× fewer iterations)
-- **Theoretical Speedup**: Up to 64× (with optimal memory bandwidth)
+---
 
-## 🧪 Testing
+## Performance Characteristics
 
-The testbench (`tb_image_diff.c`) performs:
+<table>
+<tr>
+<th width="50%">Baseline (Software)</th>
+<th width="50%">Accelerated (Hardware)</th>
+</tr>
+<tr>
+<td>
 
-1. **Input Generation**: Random 256×256 images with controlled noise
-2. **Dual Execution**: Runs both SW and HW implementations
-3. **Validation**: Compares outputs pixel-by-pixel
-4. **Statistics**: Reports distribution of posterized values
+- **Processing**: 1 pixel/iteration
+- **Memory Access**: Random pattern
+- **Platform**: CPU
+- **Iterations**: ~65,536
 
-### Expected Output
+</td>
+<td>
+
+- **Processing**: 64 pixels/cycle
+- **Memory Access**: 512-bit bursts
+- **Platform**: FPGA
+- **Iterations**: ~1,024
+
+</td>
+</tr>
+</table>
+
+### 📈 Expected Speedup
+
+For a **256×256 image** (65,536 pixels):
+
+| Version | Iterations | Theoretical Speedup |
+|---------|------------|:------------------:|
+| Baseline | 65,536 | 1× |
+| Accelerated | 1,024 | **64×** |
+
+---
+
+## Testing
+
+The testbench performs comprehensive validation:
+
+```
+1. Input Generation   → Random 256×256 images with controlled noise
+2. Dual Execution     → Runs both SW and HW implementations
+3. Validation         → Pixel-by-pixel comparison
+4. Statistics         → Reports distribution of posterized values
+```
+
+### ✅ Expected Output
 
 ```
 Starting Testbench for IMAGE_DIFF_POSTERIZE...
@@ -204,30 +238,28 @@ White Pixels (255): 14457
 Total Pixels:       65536
 ```
 
-## 🔍 HLS Optimization Techniques Used
+---
 
-1. **Pipeline Directive**: `#pragma HLS PIPELINE II=1`
-   - Enables overlapped execution of loop iterations
-   - Target initiation interval of 1 cycle
+## HLS Optimization Techniques
 
-2. **Unroll Directive**: `#pragma HLS UNROLL`
-   - Fully unrolls the 64-pixel processing loop
-   - Creates 64 parallel processing units
-
-3. **Wide Data Types**: `uint512_t` (512-bit)
-   - Matches FPGA bus width for efficient transfers
-   - Enables 64-pixel parallel processing
-
-4. **AXI Memory-Mapped Interfaces**:
-   - Separate bundles for A, B, C (gmemA, gmemB, gmemC)
-   - Enables concurrent memory access
-   - Optimizes memory bandwidth utilization
-
-## 📚 Documentation
-
-- 📄 [Assignment Specification](docs/assigment-description-lab-1.pdf) - Original lab requirements
-- 📝 [Detailed Report](docs/report.pdf) - Full technical analysis and results
+| Technique | Pragma | Effect |
+|-----------|--------|--------|
+| **Pipeline** | `#pragma HLS PIPELINE II=1` | Overlapped loop execution, 1 cycle/iteration |
+| **Unroll** | `#pragma HLS UNROLL` | 64 parallel processing units |
+| **Wide Data** | `uint512_t` | 512-bit bus, 64 pixels/access |
+| **AXI Bundles** | `gmemA`, `gmemB`, `gmemC` | Concurrent memory access |
 
 ---
 
-**Next Steps**: Proceed to [Lab 2](../lab-2/) to deploy on Vitis IDE.
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| 📄 [Assignment Specification](docs/assigment-description-lab-1.pdf) | Original lab requirements |
+| 📝 [Detailed Report](docs/report.pdf) | Full technical analysis and results |
+
+---
+
+<p align="center">
+  <strong>Next Steps:</strong> Proceed to <a href="../lab-2/">Lab 2</a> to deploy on Vitis IDE with advanced dataflow architectures.
+</p>
