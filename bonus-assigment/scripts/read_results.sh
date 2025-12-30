@@ -32,7 +32,11 @@ if [ -z "$outFile" ]; then
     if [ -z "$of" ]; then
         outFile="default_results.txt" 
     else
-        outFile="$(dirname "$inFile")/$of"
+        if [[ "$of" = /* ]]; then
+            outFile="$of"
+        else
+            outFile="$(dirname "$inFile")/$of"
+        fi
     fi
 fi
 

@@ -9,7 +9,7 @@ MAX_PARALLEL=$((MAX_PARALLEL - 1))
 GEM5_DIR="/home/arch/Desktop/gem5"
 GEM5_BIN="./build/ARM/gem5.opt"
 BENCH_DIR="/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006"
-RESULTS_DIR="/mnt/hgfs/bonus-assigment/results"
+RESULTS_DIR="/mnt/hgfs/bonus-assigment/results/default"
 LOG_DIR="$RESULTS_DIR/logs"
 
 # Get the folder where this script lives (to find read_results.sh later)
@@ -34,41 +34,41 @@ GEM5_OPTS=(
 
 mkdir -p "$LOG_DIR"
 
-# --- Command Generation ---
+# # --- Command Generation ---
 
-CMD_FILE="/tmp/step1_commands.txt"
-trap "rm -f $CMD_FILE" EXIT
-> "$CMD_FILE"
+# CMD_FILE="/tmp/step1_commands.txt"
+# trap "rm -f $CMD_FILE" EXIT
+# > "$CMD_FILE"
 
-echo "Generating commands..."
+# echo "Generating commands..."
 
-# Loop through our array to generate commands
-for bench in "${BENCHMARKS[@]}"; do
-    # Split the string by '|' delimiter
-    IFS='|' read -r name bin args <<< "$bench"
+# # Loop through our array to generate commands
+# for bench in "${BENCHMARKS[@]}"; do
+#     # Split the string by '|' delimiter
+#     IFS='|' read -r name bin args <<< "$bench"
     
-    # Write to command file
-    echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $RESULTS_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
-done
+#     # Write to command file
+#     echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $RESULTS_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
+# done
 
-# --- Execution ---
+# # --- Execution ---
 
-echo "Starting Step 1 benchmarks..."
-echo "Configuration: $MAX_PARALLEL jobs in parallel"
-echo ""
+# echo "Starting Step 1 benchmarks..."
+# echo "Configuration: $MAX_PARALLEL jobs in parallel"
+# echo ""
 
-cd "$GEM5_DIR" || exit 1
+# cd "$GEM5_DIR" || exit 1
 
-# Run in parallel
-parallel -j "$MAX_PARALLEL" --bar --joblog "$LOG_DIR/step1_jobs.log" < "$CMD_FILE"
-EXIT_STATUS=$?
+# # Run in parallel
+# parallel -j "$MAX_PARALLEL" --bar --joblog "$LOG_DIR/step1_jobs.log" < "$CMD_FILE"
+# EXIT_STATUS=$?
 
-echo ""
-if [ $EXIT_STATUS -eq 0 ]; then
-    echo "✅ All benchmarks completed successfully!"
-else
-    echo "⚠️  WARNING: Some benchmarks returned errors. Check logs in $LOG_DIR."
-fi
+# echo ""
+# if [ $EXIT_STATUS -eq 0 ]; then
+#     echo "✅ All benchmarks completed successfully!"
+# else
+#     echo "⚠️  WARNING: Some benchmarks returned errors. Check logs in $LOG_DIR."
+# fi
 
 # --- Results Collection ---
 
