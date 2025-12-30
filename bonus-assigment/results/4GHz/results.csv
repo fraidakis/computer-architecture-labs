@@ -1,0 +1,6 @@
+Benchmarks,sim_seconds,system.cpu.cpi
+../results/4GHz/specbzip,0.045690,1.827582
+../results/4GHz/specmcf,0.033344,1.333753
+../results/4GHz/spechmmer,0.029829,1.193175
+../results/4GHz/specsjeng,0.417532,16.701285
+../results/4GHz/speclibm,0.132678,5.307109
