@@ -34,8 +34,8 @@ BENCHMARKS=(
     "speclibm|$BENCH_DIR/470.lbm/src/speclibm|20 $BENCH_DIR/470.lbm/data/lbm.in 0 1 $BENCH_DIR/470.lbm/data/100_100_130_cf_a.of"
 )
 
+GEM5_SCRIPT="configs/example/se.py"
 GEM5_OPTS=(
-    "configs/example/se.py"
     "--cpu-type=MinorCPU"
     "--caches"
     "--l2cache"
@@ -64,7 +64,7 @@ for bench in "${BENCHMARKS[@]}"; do
     
     # Write to command file
     # Note: We use ${GEM5_OPTS[*]} to expand the array into a string
-    echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $BENCH_OUTPUT_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
+    echo "$GEM5_BIN -d $BENCH_OUTPUT_DIR/$name $GEM5_SCRIPT ${GEM5_OPTS[*]} -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
 done
 
 # --- Execution ---

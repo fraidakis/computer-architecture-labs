@@ -35,8 +35,8 @@ BENCHMARKS=(
 
 FREQUENCIES=("1GHz" "4GHz")
 
+GEM5_SCRIPT="configs/example/se.py"
 GEM5_OPTS_BASE=(
-    "configs/example/se.py"
     "--cpu-type=MinorCPU"
     "--caches"
     "--l2cache"
@@ -70,7 +70,7 @@ for freq in "${FREQUENCIES[@]}"; do
         
         # Write to command file
         # Using a unique log name including frequency
-        echo "$GEM5_BIN ${OPTS[*]} -d $RUN_DIR -c $bin -o \"$args\" > $LOG_DIR/${name}_${freq}.log 2>&1" >> "$CMD_FILE"
+        echo "$GEM5_BIN -d $RUN_DIR $GEM5_SCRIPT ${OPTS[*]} -c $bin -o \"$args\" > $LOG_DIR/${name}_${freq}.log 2>&1" >> "$CMD_FILE"
     done
 done
 

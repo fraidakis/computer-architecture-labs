@@ -32,8 +32,8 @@ BENCHMARKS=(
     "speclibm|$BENCH_DIR/470.lbm/src/speclibm|20 $BENCH_DIR/470.lbm/data/lbm.in 0 1 $BENCH_DIR/470.lbm/data/100_100_130_cf_a.of"
 )
 
+GEM5_SCRIPT="configs/example/se.py"
 GEM5_OPTS=(
-    "configs/example/se.py"
     "--cpu-type=MinorCPU"
     "--caches"
     "--l2cache"
@@ -62,7 +62,7 @@ for bench in "${BENCHMARKS[@]}"; do
     # Write to command file
     # OUTPUT goes to BENCH_OUTPUT_DIR (results/default/specbzip)
     # LOGS go to LOG_DIR (results/default/logs/specbzip.log)
-    echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $BENCH_OUTPUT_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
+    echo "$GEM5_BIN -d $BENCH_OUTPUT_DIR/$name $GEM5_SCRIPT ${GEM5_OPTS[*]} -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
 done
 
 # --- Execution ---
@@ -75,7 +75,7 @@ echo ""
 cd "$GEM5_DIR" || exit 1
 
 # Run in parallel
-parallel -j "$MAX_PARALLEL" --bar --joblog "$LOG_DIR/step1_jobs.log" < "$CMD_FILE"
+parallel -j "$MAX_PARALLEL" --joblog "$LOG_DIR/step1_jobs.log" < "$CMD_FILE"
 EXIT_STATUS=$?
 
 echo ""
