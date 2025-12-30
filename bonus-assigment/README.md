@@ -20,6 +20,10 @@
   - [Question 2: Baseline Performance Metrics](#question-2-baseline-performance-metrics)
   - [Question 3: Frequency Scaling](#question-3-frequency-scaling-1ghz-vs-4ghz)
   - [Question 4: Memory Technology Impact](#question-4-memory-technology-impact)
+- [Part 2: Design Exploration](#part-2-design-exploration--performance-optimization)
+  - [Benchmark Characterization](#benchmark-characterization-summary)
+  - [Optimal Cache Configurations](#optimal-cache-configurations)
+  - [Running Optimized Benchmarks](#running-optimized-benchmarks)
 
 ---
 
@@ -214,6 +218,128 @@ The results confirm the expected behavior:
 **Key Insight:** Memory upgrade impact scales with L2 miss rate:
 - **Low L2 miss rate** → Minimal benefit (compute-bound)
 - **High L2 miss rate** → Significant benefit (memory-bound)
+
+---
+
+## Part 2: Design Exploration – Performance Optimization
+
+Based on Part 1 analysis, we identified each benchmark's characteristics and designed **multiple test configurations** to find the optimal settings while respecting the constraints:
+- **Total L1 Size ≤ 256KB** (L1i + L1d)
+- **Total L2 Size ≤ 4MB**
+
+### Benchmark Characterization Summary
+
+| Benchmark | CPI (Baseline) | L1d Miss | L1i Miss | L2 Miss | Classification |
+|-----------|----------------|----------|----------|---------|----------------|
+| **hmmer** | 1.19 | 0.16% | 0.02% | 7.8% | Compute-bound |
+| **mcf** | 1.29 | 0.21% | 2.36% | 5.5% | Instruction-bound |
+| **bzip** | 1.68 | 1.48% | 0.008% | 28.2% | Data-centric |
+| **lbm** | 3.49 | 6.10% | 0.009% | 99.99% | Memory-bound |
+| **sjeng** | 10.27 | 12.18% | 0.002% | 99.99% | Severely Memory-bound |
+
+---
+
+### Test Configurations Per Benchmark
+
+#### 1. spechmmer (Compute-Bound) — 4 Configurations
+
+**Strategy:** Test minimal vs moderate caches, cacheline variations
+
+| Config | L1i | L1d | L2 | L1i Assoc | L1d Assoc | L2 Assoc | Cacheline |
+|--------|-----|-----|-----|-----------|-----------|----------|-----------|
+| cfg1 | 32kB | 32kB | 512kB | 2 | 2 | 4 | 64B |
+| cfg2 | 32kB | 64kB | 1MB | 2 | 2 | 8 | 64B |
+| cfg3 | 64kB | 64kB | 512kB | 2 | 2 | 4 | 128B |
+| cfg4 | 32kB | 32kB | 2MB | 2 | 2 | 8 | 64B |
+
+**Rationale:** Excellent cache locality with minimal miss rates. Testing if additional cache provides any benefit vs baseline minimal configuration.
+
+---
+
+#### 2. specmcf (Instruction-Bound) — 5 Configurations
+
+**Strategy:** Test L1i size and associativity variations to address high instruction miss rate
+
+| Config | L1i | L1d | L2 | L1i Assoc | L1d Assoc | L2 Assoc | Cacheline |
+|--------|-----|-----|-----|-----------|-----------|----------|-----------|
+| cfg1 | 64kB | 32kB | 512kB | 2 | 2 | 4 | 64B |
+| cfg2 | 128kB | 32kB | 512kB | 4 | 2 | 4 | 64B |
+| cfg3 | 128kB | 64kB | 1MB | 4 | 2 | 8 | 64B |
+| cfg4 | 64kB | 64kB | 2MB | 4 | 4 | 8 | 64B |
+| cfg5 | 128kB | 32kB | 1MB | 8 | 2 | 8 | 64B |
+
+**Rationale:** High L1i miss rate (2.36%) indicates irregular instruction patterns. Testing various L1i sizes and associativities to capture more code paths.
+
+---
+
+#### 3. specbzip (Data-Centric) — 5 Configurations
+
+**Strategy:** Test L1d size, L2 size, and cacheline variations for streaming data
+
+| Config | L1i | L1d | L2 | L1i Assoc | L1d Assoc | L2 Assoc | Cacheline |
+|--------|-----|-----|-----|-----------|-----------|----------|-----------|
+| cfg1 | 32kB | 64kB | 1MB | 2 | 2 | 4 | 64B |
+| cfg2 | 32kB | 128kB | 2MB | 2 | 4 | 8 | 64B |
+| cfg3 | 32kB | 128kB | 4MB | 2 | 4 | 8 | 128B |
+| cfg4 | 64kB | 128kB | 4MB | 2 | 4 | 8 | 64B |
+| cfg5 | 32kB | 128kB | 4MB | 2 | 8 | 16 | 256B |
+
+**Rationale:** Data compression involves streaming through large datasets. Testing various L1d and L2 sizes with increasing cacheline sizes for spatial locality.
+
+---
+
+#### 4. speclibm (Memory-Bound) — 5 Configurations
+
+**Strategy:** Max L2, test cacheline sizes for improved spatial locality
+
+| Config | L1i | L1d | L2 | L1i Assoc | L1d Assoc | L2 Assoc | Cacheline |
+|--------|-----|-----|-----|-----------|-----------|----------|-----------|
+| cfg1 | 32kB | 64kB | 2MB | 2 | 2 | 8 | 64B |
+| cfg2 | 32kB | 128kB | 2MB | 2 | 4 | 8 | 128B |
+| cfg3 | 32kB | 128kB | 4MB | 2 | 4 | 8 | 256B |
+| cfg4 | 64kB | 64kB | 4MB | 2 | 4 | 16 | 256B |
+| cfg5 | 32kB | 128kB | 4MB | 2 | 8 | 8 | 128B |
+
+**Rationale:** Lattice Boltzmann Method uses large array operations. 99.99% L2 miss indicates working set far exceeds cache. Testing maximum L2 with various cacheline sizes.
+
+---
+
+#### 5. specsjeng (Severely Memory-Bound) — 5 Configurations
+
+**Strategy:** Max L2, high associativity, large cacheline to address severe cache pressure
+
+| Config | L1i | L1d | L2 | L1i Assoc | L1d Assoc | L2 Assoc | Cacheline |
+|--------|-----|-----|-----|-----------|-----------|----------|-----------|
+| cfg1 | 32kB | 64kB | 2MB | 2 | 2 | 8 | 64B |
+| cfg2 | 64kB | 64kB | 2MB | 4 | 4 | 8 | 128B |
+| cfg3 | 64kB | 64kB | 4MB | 4 | 4 | 16 | 128B |
+| cfg4 | 64kB | 128kB | 4MB | 2 | 4 | 8 | 256B |
+| cfg5 | 64kB | 64kB | 4MB | 4 | 4 | 16 | 256B |
+
+**Rationale:** Chess engine with complex data structures causing severe cache thrashing. Testing maximum L2 with various associativities and cacheline sizes.
+
+---
+
+### Total Test Configuration Summary
+
+| Benchmark | # Configs | Focus Area |
+|-----------|-----------|------------|
+| **hmmer** | 4 | Cache size sufficiency |
+| **mcf** | 5 | L1i size and associativity |
+| **bzip** | 5 | L1d size and cacheline |
+| **lbm** | 5 | L2 size and cacheline |
+| **sjeng** | 5 | L2 associativity and cacheline |
+| **Total** | **24** | Comprehensive exploration |
+
+### Running Design Exploration
+
+Execute the Part 2 script to run all 24 configurations:
+
+```bash
+ssh arch@192.168.9.128 "bash /mnt/hgfs/bonus-assigment/scripts/step2.sh"
+```
+
+Results will be saved to `results/step2_exploration_results.csv`.
 
 ---
 
