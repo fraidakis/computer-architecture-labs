@@ -9,8 +9,16 @@ MAX_PARALLEL=$((MAX_PARALLEL - 1))
 GEM5_DIR="/home/arch/Desktop/gem5"
 GEM5_BIN="./build/ARM/gem5.opt"
 BENCH_DIR="/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006"
-RESULTS_DIR="/mnt/hgfs/bonus-assigment/results/default"
-LOG_DIR="$RESULTS_DIR/logs"
+
+# 1. Parent Results Directory (Stores the final CSV)
+RESULTS_DIR="/mnt/hgfs/bonus-assigment/results"
+
+# 2. Benchmark Output Directory (Stores bulky gem5 output folders & logs)
+BENCH_OUTPUT_DIR="$RESULTS_DIR/default"
+LOG_DIR="$BENCH_OUTPUT_DIR/logs"
+
+# 3. Config Directory (Stores the .ini file)
+CONFIG_DIR="$RESULTS_DIR/config"
 
 # Get the folder where this script lives (to find read_results.sh later)
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
@@ -32,47 +40,54 @@ GEM5_OPTS=(
     "-I 100000000"
 )
 
+# Create all necessary directories
+mkdir -p "$RESULTS_DIR"
+mkdir -p "$BENCH_OUTPUT_DIR"
 mkdir -p "$LOG_DIR"
+mkdir -p "$CONFIG_DIR"
 
-# # --- Command Generation ---
+# --- Command Generation ---
 
-# CMD_FILE="/tmp/step1_commands.txt"
-# trap "rm -f $CMD_FILE" EXIT
-# > "$CMD_FILE"
+CMD_FILE="/tmp/step1_commands.txt"
+trap "rm -f $CMD_FILE" EXIT
+> "$CMD_FILE"
 
-# echo "Generating commands..."
+echo "Generating commands..."
 
-# # Loop through our array to generate commands
-# for bench in "${BENCHMARKS[@]}"; do
-#     # Split the string by '|' delimiter
-#     IFS='|' read -r name bin args <<< "$bench"
+# Loop through our array to generate commands
+for bench in "${BENCHMARKS[@]}"; do
+    # Split the string by '|' delimiter
+    IFS='|' read -r name bin args <<< "$bench"
     
-#     # Write to command file
-#     echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $RESULTS_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
-# done
+    # Write to command file
+    # OUTPUT goes to BENCH_OUTPUT_DIR (results/default/specbzip)
+    # LOGS go to LOG_DIR (results/default/logs/specbzip.log)
+    echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $BENCH_OUTPUT_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
+done
 
-# # --- Execution ---
+# --- Execution ---
 
-# echo "Starting Step 1 benchmarks..."
-# echo "Configuration: $MAX_PARALLEL jobs in parallel"
-# echo ""
+echo "Starting Step 1 benchmarks..."
+echo "Output Directory: $BENCH_OUTPUT_DIR"
+echo "Configuration: $MAX_PARALLEL jobs in parallel"
+echo ""
 
-# cd "$GEM5_DIR" || exit 1
+cd "$GEM5_DIR" || exit 1
 
-# # Run in parallel
-# parallel -j "$MAX_PARALLEL" --bar --joblog "$LOG_DIR/step1_jobs.log" < "$CMD_FILE"
-# EXIT_STATUS=$?
+# Run in parallel
+parallel -j "$MAX_PARALLEL" --bar --joblog "$LOG_DIR/step1_jobs.log" < "$CMD_FILE"
+EXIT_STATUS=$?
 
-# echo ""
-# if [ $EXIT_STATUS -eq 0 ]; then
-#     echo "✅ All benchmarks completed successfully!"
-# else
-#     echo "⚠️  WARNING: Some benchmarks returned errors. Check logs in $LOG_DIR."
-# fi
+echo ""
+if [ $EXIT_STATUS -eq 0 ]; then
+    echo "✅ All benchmarks completed successfully!"
+else
+    echo "⚠️  WARNING: Some benchmarks returned errors. Check logs in $LOG_DIR."
+fi
 
 # --- Results Collection ---
 
-INI_FILE="$RESULTS_DIR/conf_step1.ini"
+INI_FILE="$CONFIG_DIR/conf_step1.ini"
 RESULTS_CSV="$RESULTS_DIR/step1_results.csv"
 
 echo "Generating results configuration at $INI_FILE..."
@@ -83,7 +98,8 @@ echo "[Benchmarks]" > "$INI_FILE"
 # Loop again to add benchmarks to INI file
 for bench in "${BENCHMARKS[@]}"; do
     IFS='|' read -r name bin args <<< "$bench"
-    echo "$RESULTS_DIR/$name" >> "$INI_FILE"
+    # Point INI to the specific benchmark output folder
+    echo "$BENCH_OUTPUT_DIR/$name" >> "$INI_FILE"
 done
 
 # Append the rest of the configuration
@@ -98,6 +114,7 @@ system.cpu.dcache.overall_miss_rate::total
 system.cpu.icache.overall_miss_rate::total
 system.l2.overall_miss_rate::total
 host_mem_usage
+
 [Output]
 $RESULTS_CSV
 EOF

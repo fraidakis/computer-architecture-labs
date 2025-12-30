@@ -2,18 +2,28 @@
 # Description: Run missing DDR3_2133 memory benchmarks (bzip, mcf, lbm) and parse results.
 
 # --- Configuration ---
+# Get the folder where this script lives (to find read_results.sh later)
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
+
 # Calculate max parallel jobs (Total Cores - 1)
 MAX_PARALLEL=$(nproc)
 MAX_PARALLEL=$((MAX_PARALLEL - 1))
 
 GEM5_DIR="/home/arch/Desktop/gem5"
 GEM5_BIN="./build/ARM/gem5.opt"
-BENCH_DIR="/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006"
-RESULTS_DIR="/mnt/hgfs/bonus-assigment/results/DDR3_2133_8x8"
-LOG_DIR="$RESULTS_DIR/logs"
+BENCH_DIR="$PROJECT_ROOT/benchmarks/spec_cpu2006"
 
-# Get the folder where this script lives (to find read_results.sh later)
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
+# 1. Parent Results Directory (Stores the final CSV)
+RESULTS_DIR="$PROJECT_ROOT/results"
+
+# 2. Benchmark Output Directory (Stores bulky gem5 output folders & logs)
+# step4 focuses on DDR3_2133 memory tests
+BENCH_OUTPUT_DIR="$RESULTS_DIR/DDR3_2133_8x8"
+LOG_DIR="$BENCH_OUTPUT_DIR/logs"
+
+# 3. Config Directory (Stores the .ini file)
+CONFIG_DIR="$RESULTS_DIR/config"
 
 # Define Benchmarks: "Output_Name|Binary_Path|Args"
 BENCHMARKS=(
@@ -33,7 +43,11 @@ GEM5_OPTS=(
     "-I 100000000"
 )
 
+# Create all necessary directories
+mkdir -p "$RESULTS_DIR"
+mkdir -p "$BENCH_OUTPUT_DIR"
 mkdir -p "$LOG_DIR"
+mkdir -p "$CONFIG_DIR"
 
 # --- Command Generation ---
 
@@ -50,7 +64,7 @@ for bench in "${BENCHMARKS[@]}"; do
     
     # Write to command file
     # Note: We use ${GEM5_OPTS[*]} to expand the array into a string
-    echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $RESULTS_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
+    echo "$GEM5_BIN ${GEM5_OPTS[*]} -d $BENCH_OUTPUT_DIR/$name -c $bin -o \"$args\" > $LOG_DIR/${name}.log 2>&1" >> "$CMD_FILE"
 done
 
 # --- Execution ---
@@ -75,8 +89,8 @@ fi
 
 # --- Results Collection ---
 
-INI_FILE="$RESULTS_DIR/conf_memory_bench.ini"
-RESULTS_CSV="$RESULTS_DIR/results.csv"
+INI_FILE="$CONFIG_DIR/conf_memory_bench.ini"
+RESULTS_CSV="$RESULTS_DIR/step4_results.csv"
 
 echo "Generating results configuration at $INI_FILE..."
 
@@ -86,7 +100,7 @@ echo "[Benchmarks]" > "$INI_FILE"
 # Loop again to add benchmarks to INI file
 for bench in "${BENCHMARKS[@]}"; do
     IFS='|' read -r name bin args <<< "$bench"
-    echo "$RESULTS_DIR/$name" >> "$INI_FILE"
+    echo "$BENCH_OUTPUT_DIR/$name" >> "$INI_FILE"
 done
 
 # Append the rest of the configuration

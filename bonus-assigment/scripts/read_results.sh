@@ -53,9 +53,16 @@ echo "" >> $outFile
 
 for bm in $bms
 do
-    file_found=$(find .. -type f -name "stats.txt" | grep $bm | head -1)
+    
+    # Check if absolute path or direct relative path exists
+    if [ -f "$bm/stats.txt" ]; then
+        file_found="$bm/stats.txt"
+    else
+        file_found=$(find .. -type f -name "stats.txt" | grep $bm | head -1)
+    fi
+    
     if [ -z "$file_found" ]; then continue; fi
-    echo -n "$bm" >> $outFile
+    echo -n "$(basename "$bm")" >> $outFile
     for p in $ps
     do
         val=$(grep $p $file_found | awk '{print $2}')

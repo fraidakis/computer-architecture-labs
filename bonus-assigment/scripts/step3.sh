@@ -2,18 +2,26 @@
 # Description: Run benchmarks at 1GHz and 4GHz frequencies and parse results.
 
 # --- Configuration ---
+# Get the folder where this script lives (to find read_results.sh later)
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
+
 # Calculate max parallel jobs (Total Cores - 1)
 MAX_PARALLEL=$(nproc)
 MAX_PARALLEL=$((MAX_PARALLEL - 1))
 
 GEM5_DIR="/home/arch/Desktop/gem5"
 GEM5_BIN="./build/ARM/gem5.opt"
-BENCH_DIR="/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006"
-RESULTS_DIR="/mnt/hgfs/bonus-assigment/results"
+BENCH_DIR="$PROJECT_ROOT/benchmarks/spec_cpu2006"
+
+# 1. Parent Results Directory
+RESULTS_DIR="$PROJECT_ROOT/results"
+
+# 2. Logs Directory (Shared for frequency tests)
 LOG_DIR="$RESULTS_DIR/logs"
 
-# Get the folder where this script lives
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
+# 3. Config Directory (Stores the .ini file)
+CONFIG_DIR="$RESULTS_DIR/config"
 
 # Define Benchmarks: "Output_Name|Binary_Path|Args"
 # Note: Output_Name will be suffixed with frequency later (e.g., specbzip becomes 1GHz/specbzip)
@@ -35,7 +43,10 @@ GEM5_OPTS_BASE=(
     "-I 100000000"
 )
 
+# Create all necessary directories
+mkdir -p "$RESULTS_DIR"
 mkdir -p "$LOG_DIR"
+mkdir -p "$CONFIG_DIR"
 
 # --- Command Generation ---
 
@@ -84,7 +95,7 @@ fi
 
 # --- Results Collection ---
 
-INI_FILE="$RESULTS_DIR/conf_step3.ini"
+INI_FILE="$CONFIG_DIR/conf_step3.ini"
 RESULTS_CSV="$RESULTS_DIR/step3_results.csv"
 
 echo "Generating results configuration at $INI_FILE..."
