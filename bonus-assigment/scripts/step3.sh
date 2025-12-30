@@ -1,106 +1,122 @@
 #!/bin/bash
+# Description: Run benchmarks at 1GHz and 4GHz frequencies and parse results.
 
 # --- Configuration ---
-GEM5_DIR=~/Desktop/gem5
-BASE_DIR=/mnt/hgfs/bonus-assigment
-BENCH_DIR=$BASE_DIR/benchmark/spec_cpu2006
-# Ensure base result directories exist
-mkdir -p $BASE_DIR/results/1GHz
-mkdir -p $BASE_DIR/results/4GHz
+# Calculate max parallel jobs (Total Cores - 1)
+MAX_PARALLEL=$(nproc)
+MAX_PARALLEL=$((MAX_PARALLEL - 1))
 
-echo "=========================================="
-echo " STEP 1: COMPILING BENCHMARKS"
-echo " (Skipping if already compiled)"
-echo "=========================================="
+GEM5_DIR="/home/arch/Desktop/gem5"
+GEM5_BIN="./build/ARM/gem5.opt"
+BENCH_DIR="/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006"
+RESULTS_DIR="/mnt/hgfs/bonus-assigment/results"
+LOG_DIR="$RESULTS_DIR/logs"
 
-# Compile all benchmarks first (just in case)
-cd $BENCH_DIR/401.bzip2/src/ && make
-cd $BENCH_DIR/429.mcf/src/ && make
-cd $BENCH_DIR/456.hmmer/src/ && make
-cd $BENCH_DIR/458.sjeng/src/ && make
-cd $BENCH_DIR/470.lbm/src/ && make
+# Get the folder where this script lives
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-echo "Compilation Finished. Starting Parallel Simulations..."
+# Define Benchmarks: "Output_Name|Binary_Path|Args"
+# Note: Output_Name will be suffixed with frequency later (e.g., specbzip becomes 1GHz/specbzip)
+BENCHMARKS=(
+    "specbzip|$BENCH_DIR/401.bzip2/src/specbzip|$BENCH_DIR/401.bzip2/data/input.program 10"
+    "specmcf|$BENCH_DIR/429.mcf/src/specmcf|$BENCH_DIR/429.mcf/data/inp.in"
+    "spechmmer|$BENCH_DIR/456.hmmer/src/spechmmer|--fixed 0 --mean 325 --num 45000 --sd 200 --seed 0 $BENCH_DIR/456.hmmer/data/bombesin.hmm"
+    "specsjeng|$BENCH_DIR/458.sjeng/src/specsjeng|$BENCH_DIR/458.sjeng/data/test.txt"
+    "speclibm|$BENCH_DIR/470.lbm/src/speclibm|20 $BENCH_DIR/470.lbm/data/lbm.in 0 1 $BENCH_DIR/470.lbm/data/100_100_130_cf_a.of"
+)
 
-# ==============================================================================
-# FUNCTION TO RUN BENCHMARKS IN PARALLEL
-# ==============================================================================
-run_suite_parallel() {
-    FREQ=$1
-    OUT_DIR=$BASE_DIR/results/$1
-    
-    echo "------------------------------------------"
-    echo " LAUNCHING ALL $FREQ BENCHMARKS SIMULTANEOUSLY..."
-    echo " Logs will be saved in: $OUT_DIR/<benchmark>/run.log"
-    echo "------------------------------------------"
+FREQUENCIES=("1GHz" "4GHz")
 
-    cd $GEM5_DIR
+GEM5_OPTS_BASE=(
+    "configs/example/se.py"
+    "--cpu-type=MinorCPU"
+    "--caches"
+    "--l2cache"
+    "-I 100000000"
+)
 
-    # 1. BZIP2
-    mkdir -p $OUT_DIR/specbzip
-    ./build/ARM/gem5.opt -d $OUT_DIR/specbzip configs/example/se.py \
-    --cpu-type=MinorCPU --caches --l2cache --cpu-clock=$FREQ \
-    -c $BENCH_DIR/401.bzip2/src/specbzip \
-    -o "$BENCH_DIR/401.bzip2/data/input.program 10" -I 100000000 \
-    > $OUT_DIR/specbzip/run.log 2>&1 &
-    PID1=$!
-    echo " -> Launched BZIP2 (PID $PID1)"
+mkdir -p "$LOG_DIR"
 
-    # 2. MCF
-    mkdir -p $OUT_DIR/specmcf
-    ./build/ARM/gem5.opt -d $OUT_DIR/specmcf configs/example/se.py \
-    --cpu-type=MinorCPU --caches --l2cache --cpu-clock=$FREQ \
-    -c $BENCH_DIR/429.mcf/src/specmcf \
-    -o "$BENCH_DIR/429.mcf/data/inp.in" -I 100000000 \
-    > $OUT_DIR/specmcf/run.log 2>&1 &
-    PID2=$!
-    echo " -> Launched MCF (PID $PID2)"
+# --- Command Generation ---
 
-    # 3. HMMER
-    mkdir -p $OUT_DIR/spechmmer
-    ./build/ARM/gem5.opt -d $OUT_DIR/spechmmer configs/example/se.py \
-    --cpu-type=MinorCPU --caches --l2cache --cpu-clock=$FREQ \
-    -c $BENCH_DIR/456.hmmer/src/spechmmer \
-    -o "--fixed 0 --mean 325 --num 45000 --sd 200 --seed 0 $BENCH_DIR/456.hmmer/data/bombesin.hmm" -I 100000000 \
-    > $OUT_DIR/spechmmer/run.log 2>&1 &
-    PID3=$!
-    echo " -> Launched HMMER (PID $PID3)"
+CMD_FILE="/tmp/step3_commands.txt"
+trap "rm -f $CMD_FILE" EXIT
+> "$CMD_FILE"
 
-    # 4. SJENG
-    mkdir -p $OUT_DIR/specsjeng
-    ./build/ARM/gem5.opt -d $OUT_DIR/specsjeng configs/example/se.py \
-    --cpu-type=MinorCPU --caches --l2cache --cpu-clock=$FREQ \
-    -c $BENCH_DIR/458.sjeng/src/specsjeng \
-    -o "$BENCH_DIR/458.sjeng/data/test.txt" -I 100000000 \
-    > $OUT_DIR/specsjeng/run.log 2>&1 &
-    PID4=$!
-    echo " -> Launched SJENG (PID $PID4)"
+echo "Generating commands..."
 
-    # 5. LBM
-    mkdir -p $OUT_DIR/speclibm
-    ./build/ARM/gem5.opt -d $OUT_DIR/speclibm configs/example/se.py \
-    --cpu-type=MinorCPU --caches --l2cache --cpu-clock=$FREQ \
-    -c $BENCH_DIR/470.lbm/src/speclibm \
-    -o "20 $BENCH_DIR/470.lbm/data/lbm.in 0 1 $BENCH_DIR/470.lbm/data/100_100_130_cf_a.of" -I 100000000 \
-    > $OUT_DIR/speclibm/run.log 2>&1 &
-    PID5=$!
-    echo " -> Launched LBM (PID $PID5)"
+# Loop through frequencies and benchmarks
+for freq in "${FREQUENCIES[@]}"; do
+    for bench in "${BENCHMARKS[@]}"; do
+        IFS='|' read -r name bin args <<< "$bench"
+        
+        # Define output directory for this specific run
+        RUN_DIR="$RESULTS_DIR/$freq/$name"
+        mkdir -p "$RUN_DIR" # Ensure directory exists
+        
+        # Add frequency option
+        OPTS=("${GEM5_OPTS_BASE[@]}" "--cpu-clock=$freq")
+        
+        # Write to command file
+        # Using a unique log name including frequency
+        echo "$GEM5_BIN ${OPTS[*]} -d $RUN_DIR -c $bin -o \"$args\" > $LOG_DIR/${name}_${freq}.log 2>&1" >> "$CMD_FILE"
+    done
+done
 
-    echo "Waiting for all $FREQ jobs to finish..."
-    wait
-    echo "All $FREQ jobs completed."
-}
+# --- Execution ---
 
-# ==============================================================================
-# EXECUTE
-# ==============================================================================
+echo "Starting Step 3 benchmarks (1GHz & 4GHz)..."
+echo "Configuration: $MAX_PARALLEL jobs in parallel"
+echo ""
 
-# Run Loop 1: 1GHz (Runs 5 benchmarks at once)
-run_suite_parallel "1GHz"
+cd "$GEM5_DIR" || exit 1
 
-# Run Loop 2: 4GHz (Runs 5 benchmarks at once)
-run_suite_parallel "4GHz"
+# Run in parallel
+parallel -j "$MAX_PARALLEL" --bar --joblog "$LOG_DIR/step3_jobs.log" < "$CMD_FILE"
+EXIT_STATUS=$?
 
-echo "=========================================="
-echo " ALL PARALLEL SIMULATIONS COMPLETED"
-echo "=========================================="
+echo ""
+if [ $EXIT_STATUS -eq 0 ]; then
+    echo "✅ All benchmarks completed successfully!"
+else
+    echo "⚠️  WARNING: Some benchmarks returned errors. Check logs in $LOG_DIR."
+fi
+
+# --- Results Collection ---
+
+INI_FILE="$RESULTS_DIR/conf_step3.ini"
+RESULTS_CSV="$RESULTS_DIR/step3_results.csv"
+
+echo "Generating results configuration at $INI_FILE..."
+
+# Start the INI file
+echo "[Benchmarks]" > "$INI_FILE"
+
+# Loop again to add benchmarks to INI file
+for freq in "${FREQUENCIES[@]}"; do
+    for bench in "${BENCHMARKS[@]}"; do
+        IFS='|' read -r name bin args <<< "$bench"
+        echo "$RESULTS_DIR/$freq/$name" >> "$INI_FILE"
+    done
+done
+
+# Append the rest of the configuration
+cat >> "$INI_FILE" << EOF
+
+[Parameters]
+sim_seconds
+system.clk_domain.clock
+system.cpu.cpi
+system.cpu.dcache.overall_miss_rate::total
+system.cpu.icache.overall_miss_rate::total
+system.l2.overall_miss_rate::total
+host_mem_usage
+
+[Output]
+$RESULTS_CSV
+EOF
+
+echo "Extracting results to CSV..."
+bash "$SCRIPT_DIR/read_results.sh" "$INI_FILE"
+
+echo "Done. Results saved to $RESULTS_CSV"

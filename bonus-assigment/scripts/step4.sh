@@ -94,10 +94,12 @@ cat >> "$INI_FILE" << EOF
 
 [Parameters]
 sim_seconds
+system.clk_domain.clock
 system.cpu.cpi
 system.cpu.dcache.overall_miss_rate::total
 system.cpu.icache.overall_miss_rate::total
 system.l2.overall_miss_rate::total
+host_mem_usage
 
 [Output]
 $RESULTS_CSV
