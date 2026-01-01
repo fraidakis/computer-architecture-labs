@@ -1,3 +1,0 @@
-Benchmarks,sim_seconds,system.cpu.cpi,system.cpu.dcache.overall_miss_rate::total,system.cpu.icache.overall_miss_rate::total,system.l2.overall_miss_rate::total
-../results/memory_test/spechmmer_2133,0.059383,1.187656,0.001623,0.000221,0.078233
-../results/memory_test/specsjeng_2133,0.493128,9.862552,0.121831,0.000020,0.999970

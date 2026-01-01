@@ -1,2 +1,4 @@
 gem5-vm/
 shared/
+config/
+results/
