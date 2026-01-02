@@ -59,7 +59,7 @@
                 "app_path": "/proc", 
                 "name": "redirect_paths0", 
                 "host_paths": [
-                    "/mnt/hgfs/bonus-assigment/results/part2/specbzip/cfg1/fs/proc"
+                    "/mnt/hgfs/bonus-assigment/results/specbzip/fs/proc"
                 ], 
                 "eventq_index": 0, 
                 "cxx_class": "RedirectPath", 
@@ -70,7 +70,7 @@
                 "app_path": "/sys", 
                 "name": "redirect_paths1", 
                 "host_paths": [
-                    "/mnt/hgfs/bonus-assigment/results/part2/specbzip/cfg1/fs/sys"
+                    "/mnt/hgfs/bonus-assigment/results/specbzip/fs/sys"
                 ], 
                 "eventq_index": 0, 
                 "cxx_class": "RedirectPath", 
@@ -81,7 +81,7 @@
                 "app_path": "/tmp", 
                 "name": "redirect_paths2", 
                 "host_paths": [
-                    "/mnt/hgfs/bonus-assigment/results/part2/specbzip/cfg1/fs/tmp"
+                    "/mnt/hgfs/bonus-assigment/results/specbzip/fs/tmp"
                 ], 
                 "eventq_index": 0, 
                 "cxx_class": "RedirectPath", 
@@ -1245,7 +1245,7 @@
                         "pid": 100, 
                         "kvmInSE": false, 
                         "cxx_class": "Process", 
-                        "executable": "/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006/401.bzip2/src/specbzip", 
+                        "executable": "/mnt/hgfs/bonus-assigment/benchmark/spec_cpu2006/401.bzip2/src/specbzip", 
                         "drivers": [], 
                         "system": "system", 
                         "gid": 100, 
@@ -1262,8 +1262,8 @@
                         "path": "system.cpu.workload", 
                         "name": "workload", 
                         "cmd": [
-                            "/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006/401.bzip2/src/specbzip", 
-                            "/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006/401.bzip2/data/input.program", 
+                            "/mnt/hgfs/bonus-assigment/benchmark/spec_cpu2006/401.bzip2/src/specbzip", 
+                            "/mnt/hgfs/bonus-assigment/benchmark/spec_cpu2006/401.bzip2/data/input.program", 
                             "10"
                         ], 
                         "errout": "cerr", 
@@ -1499,7 +1499,7 @@
             "response_latency": 20, 
             "cxx_class": "Cache", 
             "write_allocator": null, 
-            "size": 1048576, 
+            "size": 2097152, 
             "type": "Cache", 
             "clk_domain": "system.cpu_clk_domain", 
             "max_miss_count": 0, 
@@ -1527,16 +1527,16 @@
                 "indexing_policy": {
                     "name": "indexing_policy", 
                     "eventq_index": 0, 
-                    "assoc": 4, 
+                    "assoc": 8, 
                     "cxx_class": "SetAssociative", 
                     "path": "system.l2.tags.indexing_policy", 
                     "entry_size": 64, 
                     "type": "SetAssociative", 
-                    "size": 1048576
+                    "size": 2097152
                 }, 
                 "system": "system", 
                 "sequential_access": false, 
-                "assoc": 4, 
+                "assoc": 8, 
                 "power_model": [], 
                 "cxx_class": "BaseSetAssoc", 
                 "p_state_clk_gate_max": 1000000000000, 
@@ -1544,7 +1544,7 @@
                 "entry_size": 64, 
                 "block_size": 64, 
                 "type": "BaseSetAssoc", 
-                "size": 1048576
+                "size": 2097152
             }, 
             "tgts_per_mshr": 12, 
             "demand_mshr_reserve": 1, 
@@ -1562,7 +1562,7 @@
             ], 
             "p_state_clk_gate_bins": 20, 
             "sequential_access": false, 
-            "assoc": 4
+            "assoc": 8
         }, 
         "cpu_voltage_domain": {
             "name": "cpu_voltage_domain", 

@@ -37,7 +37,8 @@ BENCHMARKS=(
 # --- spechmmer: Compute-bound, excellent data locality ---
 # Optimization: Near-optimal with default, investment provides negligible returns
 CONFIGS_spechmmer=(
-    "baseline|32kB|32kB|512kB|2|2|4|64"           # Minimal viable config
+    "baseline|32kB|64kB|2MB|2|2|8|64"             # Default Config
+    "minimal|32kB|32kB|512kB|2|2|4|64"            # Minimal viable config
     "+L1d|32kB|64kB|512kB|2|2|4|64"               # Double L1d
     "+L1d=128|32kB|128kB|512kB|2|8|4|64"          # Max L1d + higher assoc
     "+128B|32kB|128kB|512kB|2|8|4|128"            # Double cacheline
@@ -48,7 +49,8 @@ CONFIGS_spechmmer=(
 # --- specmcf: Instruction-Bound with Pointer-Chasing ---
 # Optimization: Counter-intuitive - instruction-bound benefits most from data-side (larger cacheline)
 CONFIGS_specmcf=(
-    "baseline|64kB|32kB|512kB|2|2|4|64"           # Larger L1i baseline
+    "baseline|32kB|64kB|2MB|2|2|8|64"             # Default Config
+    "large_l1i|64kB|32kB|512kB|2|2|4|64"          # Larger L1i baseline
     "+assoc|64kB|64kB|512kB|2|4|4|64"             # Double L1d + 4-way
     "balanced|64kB|64kB|2MB|4|4|8|64"             # Balanced config
     "+128B|64kB|64kB|2MB|4|4|8|128"               # 2× cacheline - BREAKTHROUGH!
@@ -60,7 +62,7 @@ CONFIGS_specmcf=(
 # --- specbzip: Data-Centric Streaming ---
 # Optimization: Layered optimizations - each cache level contributes
 CONFIGS_specbzip=(
-    "baseline|32kB|64kB|1MB|2|2|4|64"             # Starting point
+    "baseline|32kB|64kB|2MB|2|2|8|64"             # Default Config
     "+L2only|32kB|64kB|2MB|2|2|8|64"              # Double L2
     "+L1d|32kB|128kB|2MB|2|4|8|64"                # Max L1d + 4-way
     "+128B|32kB|128kB|2MB|2|4|8|128"              # 2× cacheline
@@ -73,7 +75,7 @@ CONFIGS_specbzip=(
 # --- speclibm: Severely Memory-Bound Streaming ---
 # Optimization: Cacheline size is ONLY factor that matters
 CONFIGS_speclibm=(
-    "cfg1|32kB|64kB|2MB|2|2|8|64"                 # Baseline
+    "baseline|32kB|64kB|2MB|2|2|8|64"             # Default Config
     "+128B|32kB|64kB|2MB|2|2|8|128"               # 2× cacheline (-26% CPI)
     "+256B|32kB|64kB|2MB|2|2|8|256"               # 4× cacheline (-23%)
     "+512B|32kB|64kB|2MB|2|2|8|512"               # 8× cacheline (-14%)
@@ -87,7 +89,7 @@ CONFIGS_speclibm=(
 # --- specsjeng: Severely Memory-Bound with Random Access ---
 # Optimization: Maximize cacheline to 2048B, additional L1d provides marginal gains
 CONFIGS_specsjeng=(
-    "cfg1|32kB|64kB|2MB|2|2|8|64"                 # Baseline (10.271 CPI)
+    "baseline|32kB|64kB|2MB|2|2|8|64"             # Default Config
     "+128B|32kB|64kB|2MB|2|2|8|128"               # 2× cacheline (-34% CPI)
     "+256B|32kB|64kB|2MB|2|2|8|256"               # 4× cacheline (-24%)
     "+512B|32kB|64kB|2MB|2|2|8|512"               # 8× cacheline (-24%)

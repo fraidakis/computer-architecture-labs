@@ -336,7 +336,8 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
-| baseline | 32kB | 32kB | 512kB | 2/2/4 | 64B | 1.191 | **Minimal viable config** — establishes lower bound for cache sizes |
+| baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.19 | **Default Config** — establishes baseline performance |
+| minimal | 32kB | 32kB | 512kB | 2/2/4 | 64B | 1.191 | **Minimal viable config** — establishes lower bound for cache sizes |
 | +L1d | 32kB | **64kB** | 512kB | 2/2/4 | 64B | 1.188 | **Double L1d** — tests if L1d capacity is limiting factor |
 | +L1d=128 | 32kB | **128kB** | 512kB | 2/8/4 | 64B | 1.185 | **Max L1d + higher assoc** — pushes L1d to limit; 8-way reduces conflicts |
 | +128B | 32kB | 128kB | 512kB | 2/8/4 | **128B** | 1.180 | **Double cacheline** — tests spatial locality exploitation |
@@ -369,7 +370,8 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
-| baseline | 64kB | 32kB | 512kB | 2/2/4 | 64B | 1.162 | **Larger L1i baseline** — addresses high L1i miss rate observation |
+| baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.29 | **Default Config** — establishes baseline performance |
+| large_l1i | 64kB | 32kB | 512kB | 2/2/4 | 64B | 1.162 | **Larger L1i baseline** — addresses high L1i miss rate observation |
 | +assoc | 64kB | **64kB** | 512kB | 2/4/4 | 64B | 1.160 | **Double L1d + 4-way** — tests L1d impact in isolation |
 | balanced | 64kB | 64kB | **2MB** | 4/4/8 | 64B | 1.152 | **Balanced config** — moderate investments across hierarchy |
 | +128B | 64kB | 64kB | 2MB | 4/4/8 | **128B** | 1.122 | **2× cacheline** — **BREAKTHROUGH!** 2.6% improvement |
@@ -404,7 +406,7 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
-| baseline | 32kB | 64kB | 1MB | 2/2/4 | 64B | 1.712 | **Starting point** — 1MB L2 to capture some dictionary |
+| baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.68 | **Default Config** — establishes baseline performance |
 | +L2 only | 32kB | 64kB | **2MB** | 2/2/8 | 64B | 1.680 | **Double L2** — tests pure L2 capacity impact (+1.9%) |
 | +L1d | 32kB | **128kB** | 2MB | 2/4/8 | 64B | 1.643 | **Max L1d + 4-way** — reduces L1d miss penalty (+4.0%) |
 | +128B | 32kB | 128kB | 2MB | 2/4/8 | **128B** | 1.626 | **2× cacheline** — tests spatial locality benefit (+1.0%) |
@@ -446,7 +448,7 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
-| cfg1 | 32kB | 64kB | 2MB | 2/2/8 | 64B | 3.494 | **Baseline** — establishes memory-bound baseline |
+| baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 3.494 | **Default Config** — establishes memory-bound baseline |
 | +128B | 32kB | 64kB | 2MB | 2/2/8 | **128B** | 2.581 | **2× cacheline** — **-26% CPI!** streaming pattern benefits |
 | +256B | 32kB | 64kB | 2MB | 2/2/8 | **256B** | 1.991 | **4× cacheline** — **-23% additional!** diminishing but significant |
 | +512B | 32kB | 64kB | 2MB | 2/2/8 | **512B** | 1.704 | **8× cacheline** — still gaining! -14% additional |
@@ -482,7 +484,7 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
-| cfg1 | 32kB | 64kB | 2MB | 2/2/8 | 64B | 10.271 | **Baseline** — extreme memory-bound baseline |
+| baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 10.271 | **Default Config** — extreme memory-bound baseline |
 | +128B | 32kB | 64kB | 2MB | 2/2/8 | **128B** | 6.799 | **2× cacheline** — **-34% CPI!** significant despite irregular access |
 | +256B | 32kB | 64kB | 2MB | 2/2/8 | **256B** | 5.176 | **4× cacheline** — **-24% additional** |
 | +512B | 32kB | 64kB | 2MB | 2/2/8 | **512B** | 3.944 | **8× cacheline** — still significant -24% |

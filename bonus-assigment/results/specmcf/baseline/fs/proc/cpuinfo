@@ -5,7 +5,7 @@ model           : 0
 model name      : Generic
 stepping        : 0
 cpu MHz         : 2000.000
-cache size:     : 512K
+cache size:     : 2048K
 physical id     : 0
 siblings        : 1
 core id         : 0

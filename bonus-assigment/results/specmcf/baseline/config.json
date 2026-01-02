@@ -59,7 +59,7 @@
                 "app_path": "/proc", 
                 "name": "redirect_paths0", 
                 "host_paths": [
-                    "/mnt/hgfs/bonus-assigment/results/part2/specmcf/cfg1/fs/proc"
+                    "/mnt/hgfs/bonus-assigment/results/specmcf/fs/proc"
                 ], 
                 "eventq_index": 0, 
                 "cxx_class": "RedirectPath", 
@@ -70,7 +70,7 @@
                 "app_path": "/sys", 
                 "name": "redirect_paths1", 
                 "host_paths": [
-                    "/mnt/hgfs/bonus-assigment/results/part2/specmcf/cfg1/fs/sys"
+                    "/mnt/hgfs/bonus-assigment/results/specmcf/fs/sys"
                 ], 
                 "eventq_index": 0, 
                 "cxx_class": "RedirectPath", 
@@ -81,7 +81,7 @@
                 "app_path": "/tmp", 
                 "name": "redirect_paths2", 
                 "host_paths": [
-                    "/mnt/hgfs/bonus-assigment/results/part2/specmcf/cfg1/fs/tmp"
+                    "/mnt/hgfs/bonus-assigment/results/specmcf/fs/tmp"
                 ], 
                 "eventq_index": 0, 
                 "cxx_class": "RedirectPath", 
@@ -262,7 +262,7 @@
                     "response_latency": 2, 
                     "cxx_class": "Cache", 
                     "write_allocator": null, 
-                    "size": 65536, 
+                    "size": 32768, 
                     "type": "Cache", 
                     "clk_domain": "system.cpu_clk_domain", 
                     "max_miss_count": 0, 
@@ -295,7 +295,7 @@
                             "path": "system.cpu.icache.tags.indexing_policy", 
                             "entry_size": 64, 
                             "type": "SetAssociative", 
-                            "size": 65536
+                            "size": 32768
                         }, 
                         "system": "system", 
                         "sequential_access": false, 
@@ -307,7 +307,7 @@
                         "entry_size": 64, 
                         "block_size": 64, 
                         "type": "BaseSetAssoc", 
-                        "size": 65536
+                        "size": 32768
                     }, 
                     "tgts_per_mshr": 20, 
                     "demand_mshr_reserve": 1, 
@@ -1245,7 +1245,7 @@
                         "pid": 100, 
                         "kvmInSE": false, 
                         "cxx_class": "Process", 
-                        "executable": "/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006/429.mcf/src/specmcf", 
+                        "executable": "/mnt/hgfs/bonus-assigment/benchmark/spec_cpu2006/429.mcf/src/specmcf", 
                         "drivers": [], 
                         "system": "system", 
                         "gid": 100, 
@@ -1262,8 +1262,8 @@
                         "path": "system.cpu.workload", 
                         "name": "workload", 
                         "cmd": [
-                            "/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006/429.mcf/src/specmcf", 
-                            "/mnt/hgfs/bonus-assigment/benchmarks/spec_cpu2006/429.mcf/data/inp.in"
+                            "/mnt/hgfs/bonus-assigment/benchmark/spec_cpu2006/429.mcf/src/specmcf", 
+                            "/mnt/hgfs/bonus-assigment/benchmark/spec_cpu2006/429.mcf/data/inp.in"
                         ], 
                         "errout": "cerr", 
                         "useArchPT": false, 
@@ -1407,7 +1407,7 @@
                     "response_latency": 2, 
                     "cxx_class": "Cache", 
                     "write_allocator": null, 
-                    "size": 32768, 
+                    "size": 65536, 
                     "type": "Cache", 
                     "clk_domain": "system.cpu_clk_domain", 
                     "max_miss_count": 0, 
@@ -1440,7 +1440,7 @@
                             "path": "system.cpu.dcache.tags.indexing_policy", 
                             "entry_size": 64, 
                             "type": "SetAssociative", 
-                            "size": 32768
+                            "size": 65536
                         }, 
                         "system": "system", 
                         "sequential_access": false, 
@@ -1452,7 +1452,7 @@
                         "entry_size": 64, 
                         "block_size": 64, 
                         "type": "BaseSetAssoc", 
-                        "size": 32768
+                        "size": 65536
                     }, 
                     "tgts_per_mshr": 20, 
                     "demand_mshr_reserve": 1, 
@@ -1498,7 +1498,7 @@
             "response_latency": 20, 
             "cxx_class": "Cache", 
             "write_allocator": null, 
-            "size": 524288, 
+            "size": 2097152, 
             "type": "Cache", 
             "clk_domain": "system.cpu_clk_domain", 
             "max_miss_count": 0, 
@@ -1526,16 +1526,16 @@
                 "indexing_policy": {
                     "name": "indexing_policy", 
                     "eventq_index": 0, 
-                    "assoc": 4, 
+                    "assoc": 8, 
                     "cxx_class": "SetAssociative", 
                     "path": "system.l2.tags.indexing_policy", 
                     "entry_size": 64, 
                     "type": "SetAssociative", 
-                    "size": 524288
+                    "size": 2097152
                 }, 
                 "system": "system", 
                 "sequential_access": false, 
-                "assoc": 4, 
+                "assoc": 8, 
                 "power_model": [], 
                 "cxx_class": "BaseSetAssoc", 
                 "p_state_clk_gate_max": 1000000000000, 
@@ -1543,7 +1543,7 @@
                 "entry_size": 64, 
                 "block_size": 64, 
                 "type": "BaseSetAssoc", 
-                "size": 524288
+                "size": 2097152
             }, 
             "tgts_per_mshr": 12, 
             "demand_mshr_reserve": 1, 
@@ -1561,7 +1561,7 @@
             ], 
             "p_state_clk_gate_bins": 20, 
             "sequential_access": false, 
-            "assoc": 4
+            "assoc": 8
         }, 
         "cpu_voltage_domain": {
             "name": "cpu_voltage_domain", 
