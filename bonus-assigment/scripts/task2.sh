@@ -219,7 +219,7 @@ for bench in "${BENCHMARKS[@]}"; do
     
     BENCH_RESULTS="$RESULTS_DIR/$name"
     INI_FILE="$CONFIG_DIR/conf_${name}.ini"
-    RESULTS_CSV="$BENCH_RESULTS/${name}_results.csv"
+    RESULTS_CSV="$RESULTS_DIR/${name}_results.csv"
     
     # Get config array for this benchmark
     config_var="CONFIGS_$name[@]"
@@ -254,9 +254,9 @@ echo "=============================================="
 echo "Done! Results saved to:"
 echo "=============================================="
 echo ""
-echo "  results/specbzip/specbzip_results.csv"
-echo "  results/spechmmer/spechmmer_results.csv"
-echo "  results/speclibm/speclibm_results.csv"
-echo "  results/specmcf/specmcf_results.csv"
-echo "  results/specsjeng/specsjeng_results.csv"
+echo "  results/specbzip_results.csv"
+echo "  results/spechmmer_results.csv"
+echo "  results/speclibm_results.csv"
+echo "  results/specmcf_results.csv"
+echo "  results/specsjeng_results.csv"
 echo ""
