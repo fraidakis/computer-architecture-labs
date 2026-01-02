@@ -1,5 +1,6 @@
 #!/bin/bash
-# Description: Part 2 - Design Exploration: Run multiple cache configurations per benchmark
+# Description: Part 2 - Design Exploration: Test configurations from README.md analysis
+# Tests configurations reported in README.md lines 325-516
 # Each benchmark gets its own results folder with separate CSV output
 
 # --- Configuration ---
@@ -15,8 +16,8 @@ GEM5_BIN="./build/ARM/gem5.opt"
 BENCH_DIR="$PROJECT_ROOT/benchmarks/spec_cpu2006"
 
 # Results Directories - Separate folder per benchmark
-RESULTS_DIR="$PROJECT_ROOT/results/part2"
-CONFIG_DIR="$PROJECT_ROOT/results/config"
+RESULTS_DIR="$PROJECT_ROOT/results/"
+CONFIG_DIR="$PROJECT_ROOT/config/"
 
 # Benchmark Definitions: "Name|Binary|Args"
 BENCHMARKS=(
@@ -28,53 +29,73 @@ BENCHMARKS=(
 )
 
 # =============================================================================
-# TEST CONFIGURATIONS PER BENCHMARK
+# TEST CONFIGURATIONS
 # Format: "config_name|l1i_size|l1d_size|l2_size|l1i_assoc|l1d_assoc|l2_assoc|cacheline"
 # Constraints: L1 total ≤ 256KB, L2 ≤ 4MB
 # =============================================================================
 
-# --- spechmmer: Compute-bound, low miss rates ---
+# --- spechmmer: Compute-bound, excellent data locality ---
+# Optimization: Near-optimal with default, investment provides negligible returns
 CONFIGS_spechmmer=(
-    "cfg1|32kB|32kB|512kB|2|2|4|64"
-    "cfg2|32kB|64kB|1MB|2|2|8|64"
-    "cfg3|64kB|64kB|512kB|2|2|4|128"
-    "cfg4|32kB|32kB|2MB|2|2|8|64"
+    "baseline|32kB|32kB|512kB|2|2|4|64"           # Minimal viable config
+    "+L1d|32kB|64kB|512kB|2|2|4|64"               # Double L1d
+    "+L1d=128|32kB|128kB|512kB|2|8|4|64"          # Max L1d + higher assoc
+    "+128B|32kB|128kB|512kB|2|8|4|128"            # Double cacheline
+    "+256B|32kB|128kB|512kB|2|8|4|256"            # 4× cacheline
+    "+L1i|64kB|128kB|512kB|2|8|4|256"             # Double L1i (BEST: 1.177)
 )
 
-# --- specmcf: High L1i miss rate (2.36%) ---
+# --- specmcf: Instruction-Bound with Pointer-Chasing ---
+# Optimization: Counter-intuitive - instruction-bound benefits most from data-side (larger cacheline)
 CONFIGS_specmcf=(
-    "cfg1|64kB|32kB|512kB|2|2|4|64"
-    "cfg2|128kB|32kB|512kB|4|2|4|64"
-    "cfg3|128kB|64kB|1MB|4|2|8|64"
-    "cfg4|64kB|64kB|2MB|4|4|8|64"
-    "cfg5|128kB|32kB|1MB|8|2|8|64"
+    "baseline|64kB|32kB|512kB|2|2|4|64"           # Larger L1i baseline
+    "+assoc|64kB|64kB|512kB|2|4|4|64"             # Double L1d + 4-way
+    "balanced|64kB|64kB|2MB|4|4|8|64"             # Balanced config
+    "+128B|64kB|64kB|2MB|4|4|8|128"               # 2× cacheline - BREAKTHROUGH!
+    "+L2|64kB|64kB|4MB|4|4|16|128"                # 128B + max L2
+    "+256B,L1i=2way|64kB|64kB|2MB|2|4|8|256"      # 4× cacheline
+    "+512B|64kB|64kB|2MB|4|4|8|512"               # 8× cacheline (BEST: 1.105)
 )
 
-# --- specbzip: Data-centric, 28% L2 miss ---
+# --- specbzip: Data-Centric Streaming ---
+# Optimization: Layered optimizations - each cache level contributes
 CONFIGS_specbzip=(
-    "cfg1|32kB|64kB|1MB|2|2|4|64"
-    "cfg2|32kB|128kB|2MB|2|4|8|64"
-    "cfg3|32kB|128kB|4MB|2|4|8|128"
-    "cfg4|64kB|128kB|4MB|2|4|8|64"
-    "cfg5|32kB|128kB|4MB|2|8|16|256"
+    "baseline|32kB|64kB|1MB|2|2|4|64"             # Starting point
+    "+L2only|32kB|64kB|2MB|2|2|8|64"              # Double L2
+    "+L1d|32kB|128kB|2MB|2|4|8|64"                # Max L1d + 4-way
+    "+128B|32kB|128kB|2MB|2|4|8|128"              # 2× cacheline
+    "+256B|32kB|128kB|2MB|2|4|8|256"              # 4× cacheline
+    "+256B,L2=4M|32kB|128kB|4MB|2|4|16|256"       # Max L2 + 256B
+    "+assoc|32kB|128kB|4MB|2|8|16|256"            # 8-way L1d
+    "+L1d,16way|32kB|128kB|4MB|2|16|16|256"       # 16-way L1d (BEST: 1.589)
 )
 
-# --- speclibm: Memory-bound, 99.99% L2 miss ---
+# --- speclibm: Severely Memory-Bound Streaming ---
+# Optimization: Cacheline size is ONLY factor that matters
 CONFIGS_speclibm=(
-    "cfg1|32kB|64kB|2MB|2|2|8|64"
-    "cfg2|32kB|128kB|2MB|2|4|8|128"
-    "cfg3|32kB|128kB|4MB|2|4|8|256"
-    "cfg4|64kB|64kB|4MB|2|4|16|256"
-    "cfg5|32kB|128kB|4MB|2|8|8|128"
+    "cfg1|32kB|64kB|2MB|2|2|8|64"                 # Baseline
+    "+128B|32kB|64kB|2MB|2|2|8|128"               # 2× cacheline (-26% CPI)
+    "+256B|32kB|64kB|2MB|2|2|8|256"               # 4× cacheline (-23%)
+    "+512B|32kB|64kB|2MB|2|2|8|512"               # 8× cacheline (-14%)
+    "+1024B|32kB|64kB|2MB|2|2|8|1024"             # 16× cacheline (-10%)
+    "+2048B|32kB|64kB|2MB|2|2|8|2048"             # 32× cacheline (BEST: 1.496)
+    "+MicroL2-Direct|32kB|32kB|256kB|1|2|1|2048"  # Minimal L2 + direct-mapped
+    "+NanoL2128k|16kB|32kB|128kB|1|2|1|2048"      # Extreme reduction
+    "+PicoL1d16k|16kB|16kB|128kB|1|2|1|2048"      # Minimal everything
 )
 
-# --- specsjeng: Severely memory-bound ---
+# --- specsjeng: Severely Memory-Bound with Random Access ---
+# Optimization: Maximize cacheline to 2048B, additional L1d provides marginal gains
 CONFIGS_specsjeng=(
-    "cfg1|32kB|64kB|2MB|2|2|8|64"
-    "cfg2|64kB|64kB|2MB|4|4|8|128"
-    "cfg3|64kB|64kB|4MB|4|4|16|128"
-    "cfg4|64kB|128kB|4MB|2|4|8|256"
-    "cfg5|64kB|64kB|4MB|4|4|16|256"
+    "cfg1|32kB|64kB|2MB|2|2|8|64"                 # Baseline (10.271 CPI)
+    "+128B|32kB|64kB|2MB|2|2|8|128"               # 2× cacheline (-34% CPI)
+    "+256B|32kB|64kB|2MB|2|2|8|256"               # 4× cacheline (-24%)
+    "+512B|32kB|64kB|2MB|2|2|8|512"               # 8× cacheline (-24%)
+    "+1024B|32kB|64kB|2MB|2|2|8|1024"             # 16× cacheline (-17%)
+    "+2048B|32kB|64kB|2MB|2|2|8|2048"             # 32× cacheline
+    "+L1d128kB|32kB|128kB|2MB|2|2|8|2048"         # Double L1d (-0.3%)
+    "+L1d4way|32kB|128kB|2MB|2|4|8|2048"          # 4-way L1d (BEST: 3.072)
+    "+PicoL2512k|16kB|128kB|512kB|2|4|2|2048"     # Minimal L2 - proves L2 size irrelevant
 )
 
 GEM5_SCRIPT="configs/example/se.py"
@@ -103,20 +124,22 @@ for bench in "${BENCHMARKS[@]}"; do
 done
 
 echo "=============================================="
-echo "Part 2: Design Exploration - Multiple Configs"
+echo "Part 2: Design Exploration - README.md Configs"
 echo "=============================================="
 echo ""
+echo "Testing configurations from README.md analysis"
+echo ""
 echo "Results Structure:"
-echo "  results/part2/"
-echo "  ├── specbzip/     (5 configs)"
-echo "  ├── spechmmer/    (4 configs)"
-echo "  ├── speclibm/     (5 configs)"
-echo "  ├── specmcf/      (5 configs)"
-echo "  └── specsjeng/    (5 configs)"
+echo "  results/"
+echo "  ├── specbzip/     (8 configs)"
+echo "  ├── spechmmer/    (6 configs)"
+echo "  ├── speclibm/     (9 configs)"
+echo "  ├── specmcf/      (7 configs)"
+echo "  └── specsjeng/    (9 configs)"
 echo ""
 
 # --- Command Generation ---
-CMD_FILE="/tmp/part2_exploration_commands.txt"
+CMD_FILE="/tmp/part2_best_commands.txt"
 trap "rm -f $CMD_FILE" EXIT
 > "$CMD_FILE"
 
@@ -207,7 +230,7 @@ for bench in "${BENCHMARKS[@]}"; do
         echo "$BENCH_RESULTS/$cfg_name" >> "$INI_FILE"
     done
     
-    cat >> "$INI_FILE" << EOF
+    cat >> "$INI_FILE" <<EOF
 
 [Parameters]
 sim_seconds
@@ -231,9 +254,9 @@ echo "=============================================="
 echo "Done! Results saved to:"
 echo "=============================================="
 echo ""
-echo "  results/part2/specbzip/specbzip_results.csv"
-echo "  results/part2/spechmmer/spechmmer_results.csv"
-echo "  results/part2/speclibm/speclibm_results.csv"
-echo "  results/part2/specmcf/specmcf_results.csv"
-echo "  results/part2/specsjeng/specsjeng_results.csv"
+echo "  results/specbzip/specbzip_results.csv"
+echo "  results/spechmmer/spechmmer_results.csv"
+echo "  results/speclibm/speclibm_results.csv"
+echo "  results/specmcf/specmcf_results.csv"
+echo "  results/specsjeng/specsjeng_results.csv"
 echo ""
