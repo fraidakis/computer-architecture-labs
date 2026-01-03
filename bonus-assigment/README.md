@@ -320,6 +320,9 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 | **speclibm** | 3.494 | **1.496** | +57.18% | 2048B cacheline (extreme) |
 | **specsjeng** | 10.271 | **3.072** | +70.09% | 2048B cacheline, 128kB L1d, 4-way assoc |
 
+![Optimization Impact](plots/task2/optimization_impact.png)
+*Figure 5: Baseline vs Optimized CPI comparison across all benchmarks.*
+
 ---
 
 ### Tested Configurations with Results
@@ -407,7 +410,6 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
 | baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.68 | **Default Config** — establishes baseline performance |
-| +L2 only | 32kB | 64kB | **2MB** | 2/2/8 | 64B | 1.680 | **Double L2** — tests pure L2 capacity impact (+1.9%) |
 | +L1d | 32kB | **128kB** | 2MB | 2/4/8 | 64B | 1.643 | **Max L1d + 4-way** — reduces L1d miss penalty (+4.0%) |
 | +128B | 32kB | 128kB | 2MB | 2/4/8 | **128B** | 1.626 | **2× cacheline** — tests spatial locality benefit (+1.0%) |
 | +256B | 32kB | 128kB | 2MB | 2/4/8 | **256B** | 1.615 | **4× cacheline** — aggressive block sorting prefetch (+0.7%) |
@@ -514,19 +516,15 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 **Conclusion:** Maximize cacheline to 2048B for maximum benefit. Additional L1d improvements provide marginal gains. The residual 3.072 CPI represents the memory-bound floor — no cache optimization can hide 99.99% L2 miss rate.
 
+![SJENG CPI Progression](plots/task2/specsjeng_cpi_progression.png)
+*Figure 6: SJENG optimization journey showing 70% CPI reduction through cacheline scaling.*
+
 ---
 
 ### Key Findings
 
-#### Cacheline Size is the Dominant Optimization Lever
-
-| Cacheline | Best For | L1d Miss Reduction | Mechanism |
-|-----------|----------|-------------------|-----------|
-| **64B** | None (default) | Baseline | No spatial locality optimization |
-| **128B** | — | ~50% | Basic spatial prefetching |
-| **256B** | specbzip, spechmmer | ~60-75% | Streaming/sequential access patterns |
-| **512B** | specmcf | ~75% | Pointer-chasing with allocator locality |
-| **2048B** | speclibm, specsjeng | ~95% | Extreme streaming/memory-bound workloads |
+![Workload Classification](plots/task2/workload_classification.png)
+*Figure 7: Workload classification showing strong correlation between L2 miss rate and optimization potential.*
 
 #### Optimal Configurations
 

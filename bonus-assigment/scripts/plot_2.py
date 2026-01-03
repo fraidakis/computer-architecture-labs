@@ -55,43 +55,32 @@ BENCHMARK_COLORS = {
     'speclibm': '#27AE60',
 }
 
-# Version colors
-VERSION_COLORS = {
-    'default': '#95A5A6',
-    'v1': '#3498DB',
-    'v2': '#9B59B6',
-    'v3': '#E74C3C',
-}
 
-# Cache line colors
-CACHELINE_COLORS = {
-    64: '#3498DB',
-    128: '#9B59B6',
-    256: '#E74C3C',
-    512: '#27AE60',
-}
 
-# Set global style
+# Set global style - Premium modern aesthetic
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({
     'font.family': 'sans-serif',
     'font.sans-serif': ['Segoe UI', 'Arial', 'Helvetica', 'DejaVu Sans'],
-    'font.size': 11,
-    'axes.titlesize': 14,
+    'font.size': 12,
+    'axes.titlesize': 16,
     'axes.titleweight': 'bold',
-    'axes.labelsize': 12,
-    'axes.labelweight': 'medium',
-    'xtick.labelsize': 10,
-    'ytick.labelsize': 10,
-    'legend.fontsize': 10,
-    'figure.titlesize': 16,
+    'axes.labelsize': 13,
+    'axes.labelweight': 'semibold',
+    'xtick.labelsize': 11,
+    'ytick.labelsize': 11,
+    'legend.fontsize': 11,
+    'legend.framealpha': 0.95,
+    'legend.edgecolor': '#E0E0E0',
+    'figure.titlesize': 18,
     'figure.titleweight': 'bold',
-    'figure.facecolor': 'white',
-    'axes.facecolor': 'white',
-    'axes.edgecolor': '#CCCCCC',
-    'axes.linewidth': 1.2,
-    'grid.alpha': 0.3,
-    'grid.linestyle': '--',
+    'figure.facecolor': '#FAFBFC',
+    'axes.facecolor': '#FFFFFF',
+    'axes.edgecolor': '#D0D0D0',
+    'axes.linewidth': 1.5,
+    'grid.alpha': 0.25,
+    'grid.linestyle': '-',
+    'grid.linewidth': 0.8,
 })
 
 # Paths
@@ -107,204 +96,8 @@ BENCHMARKS = ['specbzip', 'spechmmer', 'specmcf', 'specsjeng', 'speclibm']
 
 
 # =============================================================================
-# DATA LOADING FUNCTIONS
-# =============================================================================
-
-def load_baseline_results() -> pd.DataFrame:
-    """Load baseline (default) benchmark results."""
-    csv_path = RESULTS_DIR / 'step1_results.csv'
-    if csv_path.exists():
-        df = pd.read_csv(csv_path)
-        df['version'] = 'default'
-        return df
-    return pd.DataFrame()
 
 
-def load_version_results(version: str) -> Dict[str, pd.DataFrame]:
-    """Load results for a specific version (v1, v2, v3)."""
-    results = {}
-    
-    if version == 'v1':
-        base_path = RESULTS_DIR / 'part2'
-    elif version == 'v2':
-        base_path = RESULTS_DIR / 'part2_v2'
-    elif version == 'v3':
-        base_path = RESULTS_DIR / 'part2_v3'
-    else:
-        return results
-    
-    for benchmark in BENCHMARKS:
-        csv_pattern = base_path / benchmark / f'{benchmark}*.csv'
-        csv_files = glob.glob(str(csv_pattern))
-        if csv_files:
-            df = pd.read_csv(csv_files[0])
-            df['benchmark'] = benchmark
-            df['version'] = version
-            results[benchmark] = df
-    
-    return results
-
-
-def load_all_configurations() -> pd.DataFrame:
-    """Load all configurations from all versions into a single DataFrame."""
-    all_data = []
-        
-    # Load V1, V2, V3
-    for version in ['v1', 'v2', 'v3']:
-        version_data = load_version_results(version)
-        for benchmark, df in version_data.items():
-            for _, row in df.iterrows():
-                config_name = row['Benchmarks']
-                cpi = row['system.cpu.cpi']
-                
-                # Skip NAN values
-                if pd.isna(cpi) or str(cpi).upper() == 'NAN':
-                    continue
-                
-                all_data.append({
-                    'benchmark': benchmark,
-                    'config': config_name,
-                    'version': version,
-                    'cpi': float(cpi),
-                    'l1d_miss': float(row['system.cpu.dcache.overall_miss_rate::total']),
-                    'l1i_miss': float(row['system.cpu.icache.overall_miss_rate::total']),
-                    'l2_miss': float(row['system.l2.overall_miss_rate::total']),
-                    'sim_seconds': float(row['sim_seconds']),
-                })
-    
-    return pd.DataFrame(all_data)
-
-
-def get_best_configs() -> pd.DataFrame:
-    """Get the best configuration for each benchmark per version."""
-    df = load_all_configurations()
-    
-    best = df.loc[df.groupby(['benchmark', 'version'])['cpi'].idxmin()]
-    return best.reset_index(drop=True)
-
-
-# =============================================================================
-# CONFIGURATION METADATA
-# =============================================================================
-
-# Cache configuration mapping (from versions.md)
-CONFIG_METADATA = {
-    # V1 configurations (cfg1-cfg5 per benchmark)
-    'cfg1': {'l1i': 32, 'l1d': 64, 'l2': 2048, 'l1i_assoc': 2, 'l1d_assoc': 2, 'l2_assoc': 8, 'cacheline': 64},
-    'cfg2': {'l1i': 64, 'l1d': 64, 'l2': 2048, 'l1i_assoc': 2, 'l1d_assoc': 4, 'l2_assoc': 8, 'cacheline': 128},
-    'cfg3': {'l1i': 64, 'l1d': 64, 'l2': 512, 'l1i_assoc': 2, 'l1d_assoc': 2, 'l2_assoc': 4, 'cacheline': 128},
-    'cfg4': {'l1i': 64, 'l1d': 64, 'l2': 2048, 'l1i_assoc': 4, 'l1d_assoc': 4, 'l2_assoc': 8, 'cacheline': 64},
-    'cfg5': {'l1i': 32, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 8, 'l2_assoc': 16, 'cacheline': 256},
-    
-    # V2 configurations (v01-v12)
-    'v01': {'l1i': 64, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 8, 'l2_assoc': 16, 'cacheline': 256},
-    'v02': {'l1i': 32, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 8, 'l2_assoc': 16, 'cacheline': 256},
-    'v03': {'l1i': 64, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 4, 'l2_assoc': 16, 'cacheline': 256},
-    'v04': {'l1i': 64, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 4, 'l1d_assoc': 4, 'l2_assoc': 16, 'cacheline': 256},
-    'v05': {'l1i': 32, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 4, 'l2_assoc': 8, 'cacheline': 64},
-    'v06': {'l1i': 64, 'l1d': 192, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 8, 'l2_assoc': 16, 'cacheline': 256},
-    'v07': {'l1i': 128, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 4, 'l1d_assoc': 8, 'l2_assoc': 16, 'cacheline': 256},
-    'v08': {'l1i': 32, 'l1d': 64, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 8, 'l2_assoc': 16, 'cacheline': 256},
-    'v09': {'l1i': 64, 'l1d': 64, 'l2': 2048, 'l1i_assoc': 4, 'l1d_assoc': 4, 'l2_assoc': 8, 'cacheline': 128},
-    'v10': {'l1i': 64, 'l1d': 64, 'l2': 512, 'l1i_assoc': 2, 'l1d_assoc': 2, 'l2_assoc': 4, 'cacheline': 256},
-    'v11': {'l1i': 64, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 8, 'l2_assoc': 8, 'cacheline': 256},
-    'v12': {'l1i': 64, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 4, 'l2_assoc': 8, 'cacheline': 256},
-    
-    # V3 configurations
-    'v3-01': {'l1i': 64, 'l1d': 128, 'l2': 512, 'l1i_assoc': 2, 'l1d_assoc': 4, 'l2_assoc': 4, 'cacheline': 256},
-    'v3-02': {'l1i': 128, 'l1d': 64, 'l2': 512, 'l1i_assoc': 4, 'l1d_assoc': 2, 'l2_assoc': 4, 'cacheline': 256},
-    'v3-03': {'l1i': 32, 'l1d': 128, 'l2': 4096, 'l1i_assoc': 2, 'l1d_assoc': 4, 'l2_assoc': 8, 'cacheline': 512},
-    
-    # Default baseline
-    'baseline': {'l1i': 32, 'l1d': 64, 'l2': 2048, 'l1i_assoc': 2, 'l1d_assoc': 2, 'l2_assoc': 8, 'cacheline': 64},
-    'minimal': {'l1i': 32, 'l1d': 32, 'l2': 512, 'l1i_assoc': 2, 'l1d_assoc': 2, 'l2_assoc': 4, 'cacheline': 64},
-}
-
-
-def get_config_cacheline(config: str) -> int:
-    """Get cacheline size for a configuration."""
-    if config in CONFIG_METADATA:
-        return CONFIG_METADATA[config]['cacheline']
-    return 64  # default
-
-
-def get_config_l1d_size(config: str) -> int:
-    """Get L1d size for a configuration."""
-    if config in CONFIG_METADATA:
-        return CONFIG_METADATA[config]['l1d']
-    return 64  # default
-
-
-# =============================================================================
-# PLOT 1: CONFIGURATION SCATTER PLOT
-# =============================================================================
-
-def plot_configuration_scatter():
-    """Create a scatter plot of L1d size vs CPI, colored by cacheline size."""
-    print("📊 Generating Configuration Scatter Plot...")
-    
-    df = load_all_configurations()
-    
-    # Add config metadata
-    df['l1d_size'] = df['config'].apply(get_config_l1d_size)
-    df['cacheline'] = df['config'].apply(get_config_cacheline)
-    
-    # Create figure with subplots for each benchmark
-    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-    axes = axes.flatten()
-    
-    for idx, benchmark in enumerate(BENCHMARKS):
-        ax = axes[idx]
-        bench_data = df[df['benchmark'] == benchmark]
-        
-        # Plot points colored by cacheline
-        for cacheline in sorted(bench_data['cacheline'].unique()):
-            subset = bench_data[bench_data['cacheline'] == cacheline]
-            color = CACHELINE_COLORS.get(cacheline, '#95A5A6')
-            
-            ax.scatter(subset['l1d_size'], subset['cpi'], 
-                      c=color, s=120, alpha=0.8, edgecolors='white',
-                      linewidth=1.5, label=f'{cacheline}B')
-        
-        # Highlight best point
-        best_idx = bench_data['cpi'].idxmin()
-        best_row = bench_data.loc[best_idx]
-        ax.scatter(best_row['l1d_size'], best_row['cpi'], 
-                  c='gold', s=250, marker='*', edgecolors='black',
-                  linewidth=2, zorder=10, label='Best')
-        
-        # Styling
-        ax.set_xlabel('L1d Cache Size (kB)', fontweight='medium')
-        ax.set_ylabel('CPI', fontweight='medium')
-        ax.set_title(f'{benchmark.replace("spec", "").upper()}', 
-                    fontsize=13, fontweight='bold', color=BENCHMARK_COLORS[benchmark])
-        
-        ax.grid(True, linestyle='--', alpha=0.4)
-        
-        # Remove top and right spines
-        for spine in ['top', 'right']:
-            ax.spines[spine].set_visible(False)
-    
-    # Hide the 6th subplot (we only have 5 benchmarks)
-    axes[5].axis('off')
-    
-    # Create a shared legend in the empty subplot space
-    handles, labels = axes[0].get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    axes[5].legend(by_label.values(), by_label.keys(), 
-                   loc='center', fontsize=12, title='Cache Line Size',
-                   title_fontsize=13, framealpha=0.95)
-    
-    fig.suptitle('Configuration Space Exploration\nL1d Size vs CPI (colored by Cache Line Size)', 
-                 fontsize=16, fontweight='bold', y=1.02)
-    
-    plt.tight_layout()
-    
-    # Save
-    output_path = OUTPUT_DIR / 'configuration_scatter.png'
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
-    plt.close()
-    print(f"   ✅ Saved: {output_path}")
 
 
 # =============================================================================
@@ -315,126 +108,146 @@ def plot_cpi_progression_per_benchmark():
     """Create line charts showing CPI progression (sorted) for each benchmark."""
     print("📊 Generating Per-Benchmark CPI Progression Curves...")
     
-    df = load_all_configurations()
+    data = load_new_benchmark_results()
     
-    for benchmark in BENCHMARKS:
-        bench_data = df[df['benchmark'] == benchmark].copy()
+    for benchmark in ['specsjeng']:  # Only generate for specsjeng
+        if benchmark not in data:
+            continue
+
+        df = data[benchmark]
+        
+        # Prepare data: clean and sort
+        bench_data = df[['Benchmarks', 'system.cpu.cpi']].copy()
+        bench_data = bench_data.rename(columns={'Benchmarks': 'config', 'system.cpu.cpi': 'cpi'})
+        bench_data = bench_data.dropna(subset=['cpi'])
+
         bench_data = bench_data.sort_values('cpi', ascending=False).reset_index(drop=True)
         
-        # Create figure
-        fig, ax = plt.subplots(figsize=(10, 7))
+        # Create figure with subtle background
+        fig, ax = plt.subplots(figsize=(12, 8))
+        fig.patch.set_facecolor('#FAFBFC')
+        ax.set_facecolor('#FFFFFF')
         
         # Get data
         x = np.arange(len(bench_data))
         cpis = bench_data['cpi'].values
         configs = bench_data['config'].values
-        versions = bench_data['version'].values
+        bench_color = BENCHMARK_COLORS.get(benchmark, '#2E86AB')
         
-        # Create colors based on version
-        point_colors = []
-        for version in versions:
-            if version == 'default':
-                point_colors.append(VERSION_COLORS['default'])
-            elif version == 'v1':
-                point_colors.append(VERSION_COLORS['v1'])
-            elif version == 'v2':
-                point_colors.append(VERSION_COLORS['v2'])
-            else:
-                point_colors.append(VERSION_COLORS['v3'])
-        
-        # Plot the progression line with gradient effect
-        # Create a smooth gradient background
+        # Create smooth gradient fill under curve
+        ax.fill_between(x, cpis, cpis[-1] * 0.9, alpha=0.08, color=bench_color)
         for i in range(len(x) - 1):
+            gradient_alpha = 0.15 - (i / len(x)) * 0.08  # Fade gradient
             ax.fill_between([x[i], x[i+1]], [cpis[i], cpis[i+1]], 
-                           alpha=0.15, color=BENCHMARK_COLORS[benchmark])
+                           alpha=gradient_alpha, color=bench_color)
         
-        # Main line
-        ax.plot(x, cpis, '-', linewidth=3, color=BENCHMARK_COLORS[benchmark], 
-                alpha=0.8, zorder=5)
+        # Shadow line for depth effect
+        ax.plot(x, cpis, '-', linewidth=6, color='#000000', alpha=0.08, zorder=4)
         
-        # Scatter points with version colors
-        for i, (xi, cpi, color) in enumerate(zip(x, cpis, point_colors)):
-            ax.scatter(xi, cpi, c=color, s=100, edgecolors='white', 
-                      linewidth=2, zorder=10)
+        # Main line with gradient-like effect
+        ax.plot(x, cpis, '-', linewidth=4, color=bench_color, alpha=0.9, zorder=5,
+                solid_capstyle='round', solid_joinstyle='round')
         
-        # Highlight best (last point after descending sort) and worst (first point)
-        # Best point - green star
-        ax.scatter(x[-1], cpis[-1], c='#27AE60', s=300, marker='*', 
-                  edgecolors='black', linewidth=2, zorder=15, label='Best')
+        # Outer glow for scatter points
+        ax.scatter(x, cpis, c=bench_color, s=180, alpha=0.2, zorder=8)
+        # Main scatter points with gradient effect
+        ax.scatter(x, cpis, c=bench_color, s=120, edgecolors='white', 
+                  linewidth=2.5, zorder=10, alpha=0.95)
         
-        # Worst point - red X
-        ax.scatter(x[0], cpis[0], c='#E74C3C', s=200, marker='X', 
-                  edgecolors='black', linewidth=2, zorder=15, label='Worst')
+        # Best point with glow effect
+        ax.scatter(x[-1], cpis[-1], c='#1ABC9C', s=500, alpha=0.2, zorder=13)  # Glow
+        ax.scatter(x[-1], cpis[-1], c='#1ABC9C', s=350, marker='*', 
+                  edgecolors='#FFFFFF', linewidth=2.5, zorder=15, label='Best')
         
-        # Add baseline reference line
-        default_cpi = bench_data[bench_data['config'] == 'default']['cpi'].values
-        if len(default_cpi) > 0:
-            ax.axhline(y=default_cpi[0], color='#95A5A6', linestyle='--', 
-                      linewidth=2, alpha=0.7, label=f'Default ({default_cpi[0]:.3f})')
+        # Worst point with glow effect  
+        ax.scatter(x[0], cpis[0], c='#E74C3C', s=350, alpha=0.2, zorder=13)  # Glow
+        ax.scatter(x[0], cpis[0], c='#E74C3C', s=220, marker='X', 
+                  edgecolors='#FFFFFF', linewidth=2.5, zorder=15, label='Baseline')
+        
+        # Baseline reference line with style
+        baseline_mask = bench_data['config'].astype(str).str.contains('baseline|cfg1', case=False)
+        if baseline_mask.any():
+            default_cpi = bench_data.loc[baseline_mask, 'cpi'].values[0]
+            ax.hlines(y=default_cpi, xmin=x[0]-0.3, xmax=x[-1]+0.3, 
+                      colors='#7F8C8D', linestyles='--', linewidth=2.5, alpha=0.6)
+            ax.text(x[-1]+0.4, default_cpi, f'Baseline\n{default_cpi:.2f}', 
+                   fontsize=10, color='#7F8C8D', va='center', fontweight='bold')
         
         # X-axis labels (config names)
         ax.set_xticks(x)
-        config_labels = [f"{c}\n({v})" for c, v in zip(configs, versions)]
-        ax.set_xticklabels(config_labels, rotation=45, ha='right', fontsize=8)
-        
-        # Add annotations for best and worst
-        ax.annotate(f'Best: {cpis[-1]:.3f}', 
-                   xy=(x[-1], cpis[-1]), 
-                   xytext=(x[-1] - 0.5, cpis[-1] - (cpis[0] - cpis[-1]) * 0.15),
-                   fontsize=11, fontweight='bold', color='#27AE60',
-                   arrowprops=dict(arrowstyle='->', color='#27AE60', lw=1.5))
-        
-        ax.annotate(f'Worst: {cpis[0]:.3f}', 
-                   xy=(x[0], cpis[0]), 
-                   xytext=(x[0] + 0.5, cpis[0] + (cpis[0] - cpis[-1]) * 0.08),
-                   fontsize=11, fontweight='bold', color='#E74C3C',
-                   arrowprops=dict(arrowstyle='->', color='#E74C3C', lw=1.5))
+        # Clean up config names
+        clean_configs = [str(c).replace('system.cpu.', '') for c in configs]
+        ax.set_xticklabels(clean_configs, rotation=45, ha='right', fontsize=9)
         
         # Calculate improvement
         improvement = ((cpis[0] - cpis[-1]) / cpis[0]) * 100
         
-        # Styling
-        ax.set_xlabel('Configuration (sorted by CPI, worst → best)', 
-                     fontweight='bold', fontsize=12)
-        ax.set_ylabel('CPI (Cycles Per Instruction)', fontweight='bold', fontsize=12)
-        ax.set_title(f'{benchmark.upper()} — CPI Progression Across Configurations\n'
-                    f'Improvement: {improvement:.1f}% (from {cpis[0]:.3f} to {cpis[-1]:.3f})', 
-                    fontsize=14, fontweight='bold', color=BENCHMARK_COLORS[benchmark],
-                    pad=20)
+        # Premium annotation boxes
+        # Best annotation - ABOVE the line
+        ax.annotate(f'✓ Best: {cpis[-1]:.2f}', 
+                   xy=(x[-1], cpis[-1]), 
+                   xytext=(x[-1] - 1.5, cpis[-1] + (cpis[0] - cpis[-1]) * 0.12),
+                   fontsize=12, fontweight='bold', color='white',
+                   bbox=dict(boxstyle='round,pad=0.5', facecolor='#1ABC9C', 
+                            edgecolor='#16A085', linewidth=2, alpha=0.95),
+                   arrowprops=dict(arrowstyle='->', color='#1ABC9C', lw=2,
+                                  connectionstyle='arc3,rad=-0.2'))
         
-        # Add legend for versions
-        legend_patches = [
-            mpatches.Patch(color=VERSION_COLORS['default'], label='Default'),
-            mpatches.Patch(color=VERSION_COLORS['v1'], label='V1'),
-            mpatches.Patch(color=VERSION_COLORS['v2'], label='V2'),
-            mpatches.Patch(color=VERSION_COLORS['v3'], label='V3'),
-        ]
-        ax.legend(handles=legend_patches, loc='upper right', framealpha=0.95,
-                 title='Version', title_fontsize=11)
+        ax.annotate(f'✗ Baseline: {cpis[0]:.2f}', 
+                   xy=(x[0], cpis[0]), 
+                   xytext=(x[0] + 1.2, cpis[0] + (cpis[0] - cpis[-1]) * 0.12),
+                   fontsize=12, fontweight='bold', color='white',
+                   bbox=dict(boxstyle='round,pad=0.5', facecolor='#E74C3C', 
+                            edgecolor='#C0392B', linewidth=2, alpha=0.95),
+                   arrowprops=dict(arrowstyle='->', color='#E74C3C', lw=2,
+                                  connectionstyle='arc3,rad=-0.2'))
         
-        # Grid
-        ax.yaxis.grid(True, linestyle='--', alpha=0.4)
+        # Styling with premium look
+        ax.set_xlabel('Configuration (sorted by CPI: worst → best)', 
+                     fontweight='bold', fontsize=13, color='#2C3E50')
+        ax.set_ylabel('CPI (Cycles Per Instruction)', fontweight='bold', fontsize=13, color='#2C3E50')
+        
+        # Title with improvement badge
+        ax.set_title(f'{benchmark.replace("spec", "").upper()} — CPI Optimization Journey', 
+                    fontsize=16, fontweight='bold', color='#2C3E50', pad=25)
+        
+        # Add improvement badge as text box
+        ax.text(0.98, 0.97, f'▼ {improvement:.1f}%\nImprovement', 
+               transform=ax.transAxes, fontsize=11, fontweight='bold',
+               va='top', ha='right', color='white',
+               bbox=dict(boxstyle='round,pad=0.6', facecolor='#27AE60', 
+                        edgecolor='#1E8449', linewidth=2, alpha=0.95))
+        
+        
+        # Premium grid styling
+        ax.yaxis.grid(True, linestyle='-', alpha=0.15, linewidth=1, color='#BDC3C7')
+        ax.xaxis.grid(True, linestyle='-', alpha=0.08, linewidth=0.5, color='#BDC3C7')
         ax.set_axisbelow(True)
         
-        # Remove top and right spines
+        # Clean spines with subtle styling
         for spine in ['top', 'right']:
             ax.spines[spine].set_visible(False)
+        for spine in ['bottom', 'left']:
+            ax.spines[spine].set_color('#D0D0D0')
+            ax.spines[spine].set_linewidth(1.5)
         
-        # Set y-axis limits with padding
+        # Set y-axis limits with generous padding
         y_range = cpis[0] - cpis[-1]
-        ax.set_ylim(cpis[-1] - y_range * 0.1, cpis[0] + y_range * 0.15)
+        ax.set_ylim(cpis[-1] - y_range * 0.15, cpis[0] + y_range * 0.2)
+        ax.set_xlim(x[0]-0.7, x[-1]+0.7)
+
+        plt.tight_layout(pad=2.0)
         
-        plt.tight_layout()
-        
-        # Save
+        # Save with high quality
         output_path = OUTPUT_DIR / f'{benchmark}_cpi_progression.png'
-        plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
+        plt.savefig(output_path, dpi=200, bbox_inches='tight', 
+                   facecolor='#FAFBFC', edgecolor='none')
         plt.close()
         print(f"   ✅ Saved: {output_path}")
 
 
 # =============================================================================
-# PLOT 3: CACHELINE SCALING (Memory-Bound Benchmarks)
+# DATA LOADING
 # =============================================================================
 
 def load_new_benchmark_results() -> Dict[str, pd.DataFrame]:
@@ -452,79 +265,6 @@ def load_new_benchmark_results() -> Dict[str, pd.DataFrame]:
                 print(f"   ⚠️ Warning: Could not load {bench}: {e}")
     return data
 
-def extract_cacheline_from_config_name(name: str) -> Optional[int]:
-    """Extract cacheline size from config name like '+128B', '+256B', etc."""
-    import re
-    # Extract from path - get last component
-    if '/' in name or '\\' in name:
-        name = Path(name).name
-    
-    match = re.search(r'\+(\d+)B', name)
-    if match:
-        return int(match.group(1))
-    if 'cfg1' in name.lower() or 'baseline' in name.lower():
-        return 64  # Default cacheline
-    return None
-
-def plot_cacheline_scaling():
-    """Plot CPI vs Cacheline Size for memory-bound benchmarks."""
-    print("📊 Generating Cacheline Scaling Plot...")
-    
-    data = load_new_benchmark_results()
-    
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    memory_bound = ['speclibm', 'specsjeng']
-    
-    for bench in memory_bound:
-        if bench not in data:
-            continue
-        df = data[bench]
-        
-        # Extract cacheline sizes and CPI
-        cacheline_cpi = []
-        for _, row in df.iterrows():
-            name = str(row['Benchmarks'])
-            cacheline = extract_cacheline_from_config_name(name)
-            cpi = row['system.cpu.cpi']
-            if cacheline and not pd.isna(cpi):
-                cacheline_cpi.append((cacheline, float(cpi)))
-        
-        if cacheline_cpi:
-            # Remove duplicates by taking average
-            from collections import defaultdict
-            cl_dict = defaultdict(list)
-            for cl, cpi in cacheline_cpi:
-                cl_dict[cl].append(cpi)
-            cacheline_cpi = [(cl, np.mean(cpis)) for cl, cpis in cl_dict.items()]
-            cacheline_cpi.sort(key=lambda x: x[0])
-            cachelines, cpis = zip(*cacheline_cpi)
-            
-            ax.plot(cachelines, cpis, 'o-', label=bench.replace('spec', '').upper(), 
-                   color=BENCHMARK_COLORS[bench], linewidth=2.5, markersize=10)
-    
-    ax.set_xscale('log', base=2)
-    ax.set_xlabel('Cacheline Size (bytes)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('CPI', fontsize=12, fontweight='bold')
-    ax.set_title('CPI vs Cacheline Size (Memory-Bound Benchmarks)\nLarger cacheline = implicit prefetching', 
-                fontsize=14, fontweight='bold')
-    ax.legend(loc='upper right', fontsize=11)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    
-    # Add improvement annotation
-    ax.annotate('Each 2× cacheline provides\n~25-40% CPI reduction', 
-               xy=(256, 4), fontsize=10, style='italic', color='gray',
-               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-    
-    for spine in ['top', 'right']:
-        ax.spines[spine].set_visible(False)
-    
-    plt.tight_layout()
-    output_path = OUTPUT_DIR / 'cacheline_scaling.png'
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close()
-    print(f"   ✅ Saved: {output_path}")
-
 
 # =============================================================================
 # PLOT 4: OPTIMIZATION IMPACT (Baseline vs Best)
@@ -536,10 +276,11 @@ def plot_optimization_impact():
     
     data = load_new_benchmark_results()
     
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(14, 8))
+    fig.patch.set_facecolor('#FAFBFC')
+    ax.set_facecolor('#FFFFFF')
     
-    x = np.arange(len(BENCHMARKS))
-    width = 0.35
+    width = 0.38
     
     baseline_cpi = []
     best_cpi = []
@@ -551,7 +292,6 @@ def plot_optimization_impact():
         df = data[bench]
         bench_names.append(bench)
         
-        # Find baseline/cfg1
         baseline_mask = df['Benchmarks'].str.contains('baseline|cfg1', case=False, na=False)
         if baseline_mask.any():
             baseline_cpi.append(df.loc[baseline_mask, 'system.cpu.cpi'].values[0])
@@ -561,102 +301,66 @@ def plot_optimization_impact():
     
     x = np.arange(len(bench_names))
     
-    bars1 = ax.bar(x - width/2, baseline_cpi, width, label='Baseline', 
-                  color='#95A5A6', alpha=0.85, edgecolor='white', linewidth=2)
-    bars2 = ax.bar(x + width/2, best_cpi, width, label='Best Config', 
-                  color=[BENCHMARK_COLORS[b] for b in bench_names], alpha=0.85, 
-                  edgecolor='white', linewidth=2)
+    # Shadow bars for depth
+    ax.bar(x - width/2 + 0.02, baseline_cpi, width, color='#000000', alpha=0.05)
+    ax.bar(x + width/2 + 0.02, best_cpi, width, color='#000000', alpha=0.05)
     
-    ax.set_ylabel('CPI', fontsize=12, fontweight='bold')
-    ax.set_xlabel('Benchmark', fontsize=12, fontweight='bold')
+    # Baseline bars with gradient effect
+    bars1 = ax.bar(x - width/2, baseline_cpi, width, label='Baseline (Default)', 
+                  color='#95A5A6', alpha=0.9, edgecolor='white', linewidth=2.5,
+                  zorder=3)
+    
+    # Best config bars with benchmark colors
+    bars2 = ax.bar(x + width/2, best_cpi, width, label='Optimized', 
+                  color=[BENCHMARK_COLORS[b] for b in bench_names], alpha=0.9, 
+                  edgecolor='white', linewidth=2.5, zorder=3)
+    
+    # Add value labels on bars
+    for bar, val in zip(bars1, baseline_cpi):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.15,
+               f'{val:.2f}', ha='center', va='bottom', fontsize=10, 
+               fontweight='bold', color='#7F8C8D')
+    
+    for bar, val in zip(bars2, best_cpi):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.15,
+               f'{val:.2f}', ha='center', va='bottom', fontsize=10, 
+               fontweight='bold', color='#2C3E50')
+    
+    ax.set_ylabel('CPI (Cycles Per Instruction)', fontsize=13, fontweight='bold', color='#2C3E50')
+    ax.set_xlabel('Benchmark', fontsize=13, fontweight='bold', color='#2C3E50')
     ax.set_title('Optimization Impact: Baseline vs Best Configuration', 
-                fontsize=14, fontweight='bold')
+                fontsize=16, fontweight='bold', color='#2C3E50', pad=20)
     ax.set_xticks(x)
-    ax.set_xticklabels([b.replace('spec', '').upper() for b in bench_names], fontsize=11)
-    ax.legend(loc='upper right', fontsize=11)
+    ax.set_xticklabels([b.replace('spec', '').upper() for b in bench_names], 
+                       fontsize=12, fontweight='bold')
     
-    # Add improvement percentages
+    # Improvement badges - on TOP of bars, consistent green color
     for i, (base, best) in enumerate(zip(baseline_cpi, best_cpi)):
         if base > 0:
             improvement = (base - best) / base * 100
-            ax.annotate(f'-{improvement:.1f}%', 
-                       xy=(i + width/2, best), 
-                       xytext=(0, -20), textcoords='offset points',
-                       ha='center', fontsize=10, fontweight='bold', color='#27AE60')
+            # Position badge further above the tallest bar (baseline)
+            ax.annotate(f'▼ {improvement:.1f}%', 
+                       xy=(i, base + 1.0), 
+                       ha='center', fontsize=11, fontweight='bold', color='white',
+                       bbox=dict(boxstyle='round,pad=0.4', facecolor='#27AE60', 
+                                edgecolor='white', linewidth=1.5, alpha=0.95))
     
-    ax.grid(True, axis='y', alpha=0.3, linestyle='--')
+    # Premium styling
+    ax.yaxis.grid(True, linestyle='-', alpha=0.15, linewidth=1, color='#BDC3C7')
+    ax.set_axisbelow(True)
     for spine in ['top', 'right']:
         ax.spines[spine].set_visible(False)
+    for spine in ['bottom', 'left']:
+        ax.spines[spine].set_color('#D0D0D0')
     
-    plt.tight_layout()
+    ax.set_ylim(0, max(baseline_cpi) * 1.25)
+    
+    plt.tight_layout(pad=2.0)
     output_path = OUTPUT_DIR / 'optimization_impact.png'
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig(output_path, dpi=200, bbox_inches='tight', facecolor='#FAFBFC')
     plt.close()
     print(f"   ✅ Saved: {output_path}")
 
-
-# =============================================================================
-# PLOT 5: CACHE MISS RATES HEATMAP
-# =============================================================================
-
-def plot_miss_rates_heatmap():
-    """Plot cache miss rates as a heatmap across benchmarks."""
-    print("📊 Generating Miss Rates Heatmap...")
-    
-    data = load_new_benchmark_results()
-    
-    # Collect miss rates for best configs
-    miss_data = []
-    for bench in BENCHMARKS:
-        if bench not in data:
-            continue
-        df = data[bench]
-        
-        # Get best config (lowest CPI)
-        best_idx = df['system.cpu.cpi'].idxmin()
-        row = df.loc[best_idx]
-        
-        miss_data.append({
-            'Benchmark': bench.replace('spec', '').upper(),
-            'L1d Miss': row['system.cpu.dcache.overall_miss_rate::total'] * 100,
-            'L1i Miss': row['system.cpu.icache.overall_miss_rate::total'] * 100,
-            'L2 Miss': row['system.l2.overall_miss_rate::total'] * 100,
-        })
-    
-    miss_df = pd.DataFrame(miss_data)
-    miss_df = miss_df.set_index('Benchmark')
-    
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Create heatmap
-    im = ax.imshow(miss_df.values, cmap='YlOrRd', aspect='auto')
-    
-    # Set ticks
-    ax.set_xticks(np.arange(len(miss_df.columns)))
-    ax.set_yticks(np.arange(len(miss_df.index)))
-    ax.set_xticklabels(miss_df.columns, fontsize=11)
-    ax.set_yticklabels(miss_df.index, fontsize=11)
-    
-    # Add colorbar
-    cbar = ax.figure.colorbar(im, ax=ax)
-    cbar.ax.set_ylabel('Miss Rate (%)', rotation=-90, va='bottom', fontsize=11)
-    
-    # Add text annotations
-    for i in range(len(miss_df.index)):
-        for j in range(len(miss_df.columns)):
-            value = miss_df.values[i, j]
-            color = 'white' if value > 50 else 'black'
-            ax.text(j, i, f'{value:.2f}%', ha='center', va='center', 
-                   color=color, fontsize=10, fontweight='bold')
-    
-    ax.set_title('Cache Miss Rates (Best Configuration per Benchmark)', 
-                fontsize=14, fontweight='bold')
-    
-    plt.tight_layout()
-    output_path = OUTPUT_DIR / 'miss_rates_heatmap.png'
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
-    plt.close()
-    print(f"   ✅ Saved: {output_path}")
 
 
 # =============================================================================
@@ -669,9 +373,13 @@ def plot_workload_classification():
     
     data = load_new_benchmark_results()
     
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(12, 9))
+    fig.patch.set_facecolor('#FAFBFC')
+    ax.set_facecolor('#FFFFFF')
     
-    # Collect data points for correlation
+    # Import Rectangle for background zones
+    from matplotlib.patches import Rectangle
+    
     l2_miss_values = []
     improvement_values = []
     
@@ -680,69 +388,92 @@ def plot_workload_classification():
             continue
         df = data[bench]
         
-        # Get baseline L2 miss rate - use first row or baseline/cfg1
         baseline_mask = df['Benchmarks'].str.contains('baseline|cfg1', case=False, na=False)
         if baseline_mask.any():
             l2_miss = df.loc[baseline_mask, 'system.l2.overall_miss_rate::total'].values[0]
             baseline_cpi = df.loc[baseline_mask, 'system.cpu.cpi'].values[0]
         else:
-            # Fallback to first row (not max, which could be wrong)
             l2_miss = df['system.l2.overall_miss_rate::total'].iloc[0]
             baseline_cpi = df['system.cpu.cpi'].iloc[0]
         
         best_cpi = df['system.cpu.cpi'].min()
         improvement = (baseline_cpi - best_cpi) / baseline_cpi * 100
         
-        # Debug output
         print(f"   {bench}: L2 miss={l2_miss:.4f} ({l2_miss*100:.2f}%), improvement={improvement:.1f}%")
         
         l2_miss_values.append(l2_miss * 100)
         improvement_values.append(improvement)
         
-        ax.scatter(l2_miss * 100, improvement, s=300, c=BENCHMARK_COLORS[bench], 
-                  edgecolors='black', linewidths=2, alpha=0.85,
-                  label=bench.replace('spec', '').upper())
+        # Outer glow effect
+        ax.scatter(l2_miss * 100, improvement, s=600, c=BENCHMARK_COLORS[bench], 
+                  alpha=0.15, zorder=3)
+        # Main point with premium styling
+        ax.scatter(l2_miss * 100, improvement, s=400, c=BENCHMARK_COLORS[bench], 
+                  edgecolors='white', linewidths=3, alpha=0.9, zorder=5)
+        
+        # Premium label
         ax.annotate(bench.replace('spec', '').upper(), 
                    (l2_miss * 100, improvement), 
-                   xytext=(8, 5), textcoords='offset points', 
-                   fontsize=10, fontweight='bold')
+                   xytext=(12, 8), textcoords='offset points', 
+                   fontsize=11, fontweight='bold', color='#2C3E50',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                            edgecolor=BENCHMARK_COLORS[bench], linewidth=1.5, alpha=0.9))
     
-    # Add correlation/trend line
+    # Trend line with confidence band effect
     if len(l2_miss_values) >= 2:
         z = np.polyfit(l2_miss_values, improvement_values, 1)
         p = np.poly1d(z)
-        x_line = np.linspace(min(l2_miss_values) - 5, max(l2_miss_values) + 5, 100)
-        ax.plot(x_line, p(x_line), '--', color='#E74C3C', linewidth=2, alpha=0.7,
-               label=f'Trend (r={np.corrcoef(l2_miss_values, improvement_values)[0,1]:.2f})')
+        x_line = np.linspace(0, max(l2_miss_values) + 5, 100)
+        y_line = p(x_line)
+        
+        # Confidence band - purple color to distinguish from memory-bound zone
+        ax.fill_between(x_line, y_line - 5, y_line + 5, alpha=0.1, color='#8B5CF6')
+        ax.plot(x_line, y_line, '-', color='#7C3AED', linewidth=3, alpha=0.8,
+               label=f'Trend (ρ = {np.corrcoef(l2_miss_values, improvement_values)[0,1]:.2f})')
     
-    ax.set_xlabel('Baseline L2 Miss Rate (%)', fontsize=12, fontweight='bold')
-    ax.set_ylabel('CPI Improvement (%)', fontsize=12, fontweight='bold')
+    ax.set_xlabel('Baseline L2 Miss Rate (%)', fontsize=14, fontweight='bold', color='#2C3E50')
+    ax.set_ylabel('CPI Improvement (%)', fontsize=14, fontweight='bold', color='#2C3E50')
     ax.set_title('Workload Classification: Memory-Bound vs Compute-Bound', 
-                fontsize=14, fontweight='bold')
+                fontsize=16, fontweight='bold', color='#2C3E50', pad=20)
     
-    # Add quadrant annotations (only if data spans these regions)
-    ax.axhline(y=20, color='gray', linestyle='--', alpha=0.4, linewidth=1)
-    ax.axvline(x=50, color='gray', linestyle='--', alpha=0.4, linewidth=1)
+    # Background zone rectangles (like plot_1.py style)
+    max_imp = max(improvement_values) + 15
+    # Compute-bound zone (left, green)
+    compute_zone = Rectangle((0, 0), 50, max_imp, linewidth=0, 
+                              facecolor='#10b981', alpha=0.12)
+    ax.add_patch(compute_zone)
     
-    # Position text boxes based on actual data range
-    ax.text(15, 3, 'Compute-Bound', ha='center', fontsize=9, color='#27AE60', fontweight='bold',
-           bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-    ax.text(85, max(improvement_values) - 5, 'Memory-Bound', ha='center', fontsize=9, 
-           color='#E74C3C', fontweight='bold',
-           bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    # Memory-bound zone (right, red)
+    memory_zone = Rectangle((50, 0), 60, max_imp, linewidth=0, 
+                             facecolor='#ef4444', alpha=0.12)
+    ax.add_patch(memory_zone)
     
-    ax.legend(loc='upper left', fontsize=10)
-    ax.grid(True, alpha=0.3, linestyle='--')
+    # Zone labels at top
+    ax.text(25, max_imp - 3, 'COMPUTE-BOUND', fontsize=10, fontweight='bold', 
+            ha='center', va='top', color='#059669', alpha=0.85)
+    ax.text(80, max_imp - 3, 'MEMORY-BOUND', fontsize=10, fontweight='bold', 
+            ha='center', va='top', color='#dc2626', alpha=0.85)
+    
+    # Divider line
+    ax.axvline(x=50, color='#cbd5e1', linestyle='--', linewidth=1.5, alpha=0.7)
+    
+    # Premium legend and grid
+    legend = ax.legend(loc='upper left', fontsize=11, framealpha=0.95,
+                      edgecolor='#E0E0E0', fancybox=True, shadow=True)
+    ax.grid(True, alpha=0.15, linestyle='-', linewidth=1, color='#BDC3C7')
+    ax.set_axisbelow(True)
+    
     for spine in ['top', 'right']:
         ax.spines[spine].set_visible(False)
+    for spine in ['bottom', 'left']:
+        ax.spines[spine].set_color('#D0D0D0')
     
-    # Set axis limits with padding
-    ax.set_xlim(0, max(l2_miss_values) + 10)
-    ax.set_ylim(0, max(improvement_values) + 10)
+    ax.set_xlim(-5, max(l2_miss_values) + 15)
+    ax.set_ylim(-5, max(improvement_values) + 15)
     
-    plt.tight_layout()
+    plt.tight_layout(pad=2.0)
     output_path = OUTPUT_DIR / 'workload_classification.png'
-    plt.savefig(output_path, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.savefig(output_path, dpi=200, bbox_inches='tight', facecolor='#FAFBFC')
     plt.close()
     print(f"   ✅ Saved: {output_path}")
 
@@ -767,30 +498,14 @@ def main():
     
     # Generate plots
     try:
-        plot_configuration_scatter()
-    except Exception as e:
-        print(f"   ❌ Error generating scatter plot: {e}")
-    
-    try:
         plot_cpi_progression_per_benchmark()
     except Exception as e:
         print(f"   ❌ Error generating CPI progression charts: {e}")
-    
-    # New plots using the reorganized results
-    try:
-        plot_cacheline_scaling()
-    except Exception as e:
-        print(f"   ❌ Error generating cacheline scaling plot: {e}")
     
     try:
         plot_optimization_impact()
     except Exception as e:
         print(f"   ❌ Error generating optimization impact plot: {e}")
-    
-    try:
-        plot_miss_rates_heatmap()
-    except Exception as e:
-        print(f"   ❌ Error generating miss rates heatmap: {e}")
     
     try:
         plot_workload_classification()
