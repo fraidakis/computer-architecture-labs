@@ -1,5 +1,5 @@
 #!/bin/bash
-# Description: Run missing DDR3_2133 memory benchmarks (bzip, mcf, lbm) and parse results.
+# Description: Run DDR3_2133 memory benchmarks and parse results.
 
 # --- Configuration ---
 # Get the folder where this script lives (to find read_results.sh later)

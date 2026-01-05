@@ -24,6 +24,10 @@
   - [Benchmark Characterization](#benchmark-characterization-summary)
   - [Optimal Cache Configurations](#optimal-cache-configurations)
   - [Running Optimized Benchmarks](#running-optimized-benchmarks)
+- [Part 3: Cost Function & Cost/Performance Optimization](#part-3-cost-function--costperformance-optimization)
+  - [Cost Function Derivation](#cost-function-derivation)
+  - [Cost Analysis Results](#cost-analysis-results)
+  - [Optimal Architecture Recommendation](#optimal-architecture-recommendation)
 
 ---
 
@@ -491,7 +495,7 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 | +256B | 32kB | 64kB | 2MB | 2/2/8 | **256B** | 5.176 | **4× cacheline** — **-24% additional** |
 | +512B | 32kB | 64kB | 2MB | 2/2/8 | **512B** | 3.944 | **8× cacheline** — still significant -24% |
 | +1024B | 32kB | 64kB | 2MB | 2/2/8 | **1024B** | 3.261 | **16× cacheline** — -17% |
-| +2048B | 32kB | 64kB | 2MB | 2/2/8 | **2048B** | **3.084** | **32× cacheline** — approaching floor |
+| +2048B | 32kB | 64kB | 2MB | 2/2/8 | **2048B** | 3.084 | **32× cacheline** — approaching floor |
 | +L1d 128kB | 32kB | **128kB** | 2MB | 2/2/8 | 2048B | 3.076 | **Double L1d** — tiny additional gain (-0.3%) |
 | +L1d 4way | 32kB | 128kB | 2MB | 2/**4**/8 | 2048B | **3.072** | **4-way L1d** — eliminates remaining conflicts |
 | +Pico L2 512k | 16kB | 128kB | **512kB** | 2/4/2 | 2048B | 3.072 | **Minimal L2** — proves L2 size irrelevant |
@@ -531,10 +535,258 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 | Benchmark | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | Final CPI | Improvement |
 |-----------|-----|-----|-----|----------------|-----------|-----------|-------------|
 | **spechmmer** | 64kB | 128kB | 512kB | 2/8/4 | 256B | **1.177** | +1.2% |
-| **specmcf** | 64kB | 64kB | 2MB | 4/4/8 | 512B | **1.105** | +4.9% |
-| **specbzip** | 32kB | 128kB | 4MB | 2/16/16 | 256B | **1.589** | +7.2% |
-| **speclibm** | 16kB | 16kB | 128kB | 1/2/1 | 2048B | **1.496** | +57.2% |
-| **specsjeng** | 32kB | 128kB | 2MB | 2/4/8 | 2048B | **3.072** | +70.1% |
+| **specmcf** | 64kB | 64kB | 2MB | 4/4/8 | 512B | **1.105** | +14.6% |
+| **specbzip** | 32kB | 128kB | 4MB | 2/16/16 | 256B | **1.589** | +5.4% |
+| **speclibm** | 32kB | 32kB | 256kB | 1/2/1 | 2048B | **1.496** | +57.2% |
+| **specsjeng** | 16kB | 128kB | 512kB | 2/4/2 | 2048B | **3.072** | +70.1% |
+
+---
+
+## Part 3: Cost Function & Cost/Performance Optimization
+
+### Cost Function Derivation
+
+To model silicon cost accurately, we developed a **physically-based additive cost function** that reflects actual cache architecture. This section provides the complete derivation and validation of our cost model.
+
+---
+
+#### Cache Architecture Components
+
+A cache chip consists of three main components, each with distinct cost characteristics:
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    CACHE CHIP                       │
+├─────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────────────┐  │
+│  │             DATA ARRAY (90-95%)               │  │ ← Fixed by capacity
+│  │         Stores actual cache data              │  │    NOT affected by
+│  │         Size = Capacity in bits               │  │    associativity
+│  └───────────────────────────────────────────────┘  │
+│  ┌─────────────────────┐ ┌─────────────────────┐    │
+│  │   TAG ARRAY (3-5%)  │ │  LOGIC (2-5%)       │    │ ← Scales with:
+│  │   Stores addresses  │ │  Comparators, MUX   │    │    - Associativity
+│  │   Size ∝ 1/LineSize │ │  Decoders, LRU      │    │    - 1/LineSize
+│  └─────────────────────┘ └─────────────────────┘    │
+└─────────────────────────────────────────────────────┘
+```
+
+Our **additive cost model** reflects this structure:
+$$C = C_{data} + C_{tag} + C_{logic}$$
+
+Each component scales independently based on its own physics.
+
+---
+
+#### Cost Model Derivation
+
+##### Step 1: Data Array Cost
+
+The Data Array stores the actual cached data. Its area is:
+
+$$A_{data} = S_{cache} \times \gamma$$
+
+Where:
+- $S_{cache}$ = Cache capacity in bits (or KB)
+- $\gamma$ = **Cell Density Factor** (area per bit)
+
+**Cell Density Values:**
+
+| Cache Level | Cell Type | Reason | $\gamma$ Value |
+|-------------|-----------|--------|----------------|
+| **L1** | 8T SRAM | Speed (faster read, dual-port) | $\gamma_{L1} \approx 2.0$ |
+| **L2** | 6T SRAM | Density (smaller, single-port) | $\gamma_{L2} \approx 1.0$ (baseline) |
+
+$$
+\boxed{C_{data} = S_{L1} \times 2.0 + S_{L2} \times 1.0}
+$$
+
+> The γ = 2.0 factor for L1 is based on physical SRAM cell measurements: 8T cells (used in L1 for speed) are approximately 1.6-2× larger than 6T cells (used in L2 for density).
+
+##### Step 2: Tag Array Cost
+
+Each cache line needs a **tag** to identify which memory address it holds.
+
+**Tag Calculation:**
+
+For a cache with:
+- Capacity $S$ (in bytes)
+- Line size $CL$ (in bytes)
+- Associativity $W$ (ways)
+- Address width $A_w$ (typically 32 or 48 bits)
+
+Number of lines: $N = \frac{S}{CL}$
+
+Number of sets: $Sets = \frac{N}{W} = \frac{S}{CL \times W}$
+
+Tag width: $T_w = A_w - \log_2(CL) - \log_2(Sets)$
+
+**Simplified (for 32-bit address):**
+$$T_w \approx 32 - \log_2(CL) - \log_2\left(\frac{S}{CL \times W}\right)$$
+
+**Status bits per line:**
+$$\sigma = 1 \text{ (valid)} + 1 \text{ (dirty)} + \lceil\log_2(W)\rceil \text{ (LRU)} \approx 2 + \log_2(W)$$
+
+**Tag Array Size:**
+$$A_{tag} = N \times (T_w + \sigma) = \frac{S}{CL} \times (T_w + \sigma)$$
+
+**Key Insight:** Tag area scales as **1/CL** — larger cachelines mean fewer lines, hence fewer tags!
+
+$$
+\boxed{C_{tag} = \sum_{i \in \{L1,L2\}} \frac{S_i}{CL} \times (T_{w,i} + \sigma_i) \times \gamma_i}
+$$
+
+##### Step 3: Logic Overhead Cost
+
+Associativity requires additional logic:
+- **N comparators** (one per way)
+- **N:1 MUX** for data selection
+- **Priority encoder** for hit detection
+- **LRU/PLRU tracking** hardware
+
+This logic scales with:
+1. Number of ways (W)
+2. Number of tag bits (which scales with 1/CL)
+
+We model this as a **percentage overhead on the tag structure:**
+
+$$C_{logic} = C_{tag} \times \delta \times W$$
+
+Where $\delta \approx 0.02$ (2% per way) based on cache design literature (comparator + MUX overhead per way).
+
+$$
+\boxed{C_{logic} = \sum_{i \in \{L1,L2\}} \frac{S_i}{CL} \times (T_{w,i} + \sigma_i) \times \gamma_i \times \delta \times W_i}
+$$
+
+##### Step 4: Complete Physical Model
+
+Combining all components:
+
+$$
+\boxed{C_{total} = \underbrace{(S_{L1} \cdot \gamma_{L1}) + (S_{L2} \cdot \gamma_{L2})}_{\text{Data Array Cost}} + \underbrace{\sum_{i=L1,L2} \left( \frac{S_{i}}{CL} \cdot (T_{w,i} + \sigma_i) \cdot \gamma_{i} \cdot (1 + \delta \cdot W_i) \right)}_{\text{Tag \& Logic Overhead}}}
+$$
+
+**Parameter Values:**
+
+| Parameter | Value | Physical Basis |
+|-----------|-------|----------------|
+| $\gamma_{L1}$ | 2.0 | 8T vs 6T cell area ratio |
+| $\gamma_{L2}$ | 1.0 | Baseline (6T SRAM) |
+| $T_w$ | ≈20-26 bits | 32-bit address - log(CL) - log(Sets) |
+| $\sigma$ | 2 + log₂(W) | Valid + Dirty + LRU bits |
+| $\delta$ | 0.02 | ~2% comparator/mux overhead per way |
+
+---
+
+#### Simplified Proxy Formula
+
+For optimization loops where the full bit-level calculation is cumbersome, we derive a **calibrated approximation**:
+
+$$
+\boxed{C_{approx} = 2.0 \cdot S_{L1} + 1.0 \cdot S_{L2} + S_{total} \times \frac{A_w}{CL} \times (1 + 0.05 \cdot \overline{W})}
+$$
+
+**Where:**
+- $S_{L1}, S_{L2}$ = Cache sizes in KB
+- $CL$ = Cacheline size in bytes
+- $A_w$ = Address width in bits (32 for this system)
+- $\overline{W}$ = Average associativity across caches
+
+**Component Breakdown:**
+
+| Component | Simplified Term | Physical Meaning |
+|-----------|-----------------|------------------|
+| $2.0 \cdot S_{L1}$ | L1 Data Array | 8T cells are 2× larger |
+| $1.0 \cdot S_{L2}$ | L2 Data Array | 6T baseline |
+| $\frac{A_w}{CL}$ | Tag Overhead | Larger lines → fewer tags |
+| $(1 + 0.05 \cdot W)$ | Logic Overhead | ~5% per way on overhead only |
+
+---
+
+#### Sources & References
+
+| Claim | Source | Key Data |
+|-------|--------|----------|
+| L1 vs L2 cell area | Intel Skylake Die Analysis (WikiChip) | 8T: ~0.082 μm², 6T: ~0.050 μm² → **1.64×** |
+| SRAM cell scaling | ISSCC Papers (2015-2020) | 8T cells ~1.5-2× larger than 6T |
+| Tag overhead | H&P 6th Ed., Chapter 2 | Tag bits = Addr - log(Line) - log(Sets) |
+| Associativity logic | Computer Architecture textbooks | N comparators + N:1 MUX per set |
+
+---
+
+### Cost Analysis Results
+
+#### Configuration Cost Comparison
+
+Using the physical model: $C = 2 \cdot S_{L1} + S_{L2} + \text{TagOverhead}$
+
+| Benchmark | Configuration | Data Cost | Tag Overhead | **Total Cost** | **CPI** | **CPI × Cost** |
+|-----------|---------------|-----------|--------------|----------------|---------|----------------|
+| **spechmmer** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 1.191 | 3,918 |
+| | Optimized (192KB L1, 512KB, 256B, 8-way) | 896 | 78 | 974 | **1.177** | **1,148** |
+| **specmcf** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 1.294 | 4,257 |
+| | Optimized (128KB L1, 2MB, 512B, 4-way) | 2,256 | 135 | 2,391 | **1.105** | **2,642** |
+| **specbzip** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 1.712 | 5,632 |
+| | Optimized (160KB L1, 4MB, 256B, 16-way) | 4,320 | 210 | 4,530 | **1.589** | **7,194** |
+| **speclibm** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 3.494 | 11,496 |
+| | Optimized (**32KB L1, 128KB L2**, 2048B, 1-way) | **192** | **3** | **195** | **1.496** | **292** |
+| **specsjeng** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 10.271 | 33,792 |
+| | Optimized (160KB L1, 512KB L2, 2048B, 4-way) | 832 | 11 | 843 | **3.072** | **2,590** |
+
+---
+
+### Cost vs Performance Trade-off
+
+![Cost vs Performance Trade-off](plots/task3/cost_performance_tradeoff.png)
+*Figure 8: Cost vs CPI showing optimization paths.*
+
+---
+
+### Cost-Efficiency Comparison
+
+![Cost Efficiency](plots/task3/cost_efficiency.png)
+*Figure 9: Cost × CPI comparison showing dramatic improvements for streaming workloads (speclibm, specsjeng).*
+
+---
+
+### The "2048B Cacheline" Illusion
+
+Our cost-performance analysis consistently points to **extreme cacheline sizes (2048B)** as the optimal solution. Before drawing conclusions, we must understand *why* simulation rewards this configuration and *why* real CPUs don't implement it.
+
+#### Why 2048B Cachelines Appear Optimal
+
+| Benefit in Simulation | Mechanism |
+|-----------------------|-----------|
+| **Tag Array Reduction** | 2048B lines = 32× fewer cache lines → 32× fewer tags → 32× less tag SRAM |
+| **Implicit Prefetching** | Loading 2048B per miss amortizes memory latency over many subsequent accesses |
+| **Miss Rate Collapse** | For streaming workloads (speclibm, specsjeng), L1d miss rate drops from ~6-12% → ~0.2% |
+| **Cost Model Savings** | Tag overhead term ($S/CL$) shrinks dramatically, slashing total cost |
+
+The speclibm configuration (32KB L1, 128KB L2, 2048B line) achieves:
+- **CPI = 1.496** (57% better than baseline)
+- **Cost = 195 units** (94% cheaper than baseline)
+- **CPI × Cost = 292** (the lowest value seen in all experiments)
+
+#### The Physical Reality: Why 2048B Lines Are Unimplementable
+
+| Hardware Constraint | Impact of 2048B Lines |
+|---------------------|----------------------|
+| **Memory Bus Bandwidth** | DDR3/4/5 buses are 64-bits wide. A 2048B line requires **256 consecutive burst transfers** — holding the bus for ~160ns (at DDR3-1600 speeds) |
+| **Fill Buffer Blocking** | During those 160ns, all other pending loads/stores wait. A single L1 miss stalls *all* memory traffic for ~320 CPU cycles (at 2GHz) |
+| **Latency Sensitivity** | Latency-critical workloads (databases, web servers) cannot tolerate 100+ cycle stalls on every miss |
+
+#### Why Real CPUs Use 64B Lines
+
+Modern processors (Intel, AMD, ARM) have converged on **64-byte cachelines** as the sweet spot:
+
+| Consideration | 64B Choice Rationale |
+|---------------|----------------------|
+| **DDR Burst Alignment** | 64B = 8 transfers × 8 bytes = matches natural DDR burst (BL8) |
+| **Miss Penalty** | ~40-80ns latency is tolerable; 160ns+ is catastrophic for IPC |
+| **False Sharing** | 64B granularity limits multi-core coherence traffic |
+| **Prefetcher Synergy** | Hardware prefetchers (stride, stream) achieve "large line" effect *without* the bus contention |
+
+> **Simulation Verdict:** 2048B lines are an *artifact of the simulator's idealized memory model* — gem5 doesn't penalize bus blocking, coherence traffic, or fill buffer depth. In real silicon, 128B is the practical maximum.
 
 ---
 
@@ -542,18 +794,27 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 ```
 bonus-assignment/
+├── 📂 benchmarks/            # SPEC CPU2006 benchmark binaries & inputs
+├── 📂 docs/
+│   ├── assigment-description.pdf
+│   └── gem5-presentation.pdf
+├── 📂 plots/
+│   ├── 📂 task1/             # Part 1 visualizations (CPI, miss rates, scaling)
+│   ├── 📂 task2/             # Part 2 visualizations (optimization impact)
+│   └── 📂 task3/             # Part 3 visualizations (cost analysis)
 ├── 📂 results/
-│   ├── 📂 default/          # Baseline runs (2 GHz CPU)
-│   │   ├── specbzip/
-│   │   ├── spechmmer/
-│   │   ├── specmcf/
-│   │   ├── specsjeng/
-│   │   └── speclibm/
+│   ├── 📂 default/           # Baseline runs (2 GHz CPU)
 │   ├── 📂 1GHz/              # 1 GHz CPU frequency tests
 │   ├── 📂 4GHz/              # 4 GHz CPU frequency tests
-│   └── 📂 memory_test/       # DDR3_2133 memory tests
-├── 📂 shared/
-│   └── final.md              # Assignment specification
+│   ├── 📂 DDR3_2133_8x8/     # DDR3_2133 memory tests
+│   ├── 📂 spec{bzip,hmmer,mcf,libm,sjeng}/  # Per-benchmark optimization runs
+│   └── *.csv                 # Parsed results summaries
+├── 📂 scripts/
+│   ├── plot_1.py             # Part 1 plotting (baseline analysis)
+│   ├── plot_2.py             # Part 2 plotting (optimization results)
+│   ├── plot_3.py             # Part 3 plotting (cost analysis)
+│   ├── read_results.sh       # gem5 stats.txt parser
+│   └── task*.sh              # Automation scripts for gem5 runs
 └── 📜 README.md              # This file
 ```
 
@@ -570,10 +831,24 @@ bonus-assignment/
 
 ---
 
+## 📚 References
+
+1. **Hennessy, J. L., & Patterson, D. A.** (2019). *Computer Architecture: A Quantitative Approach* (6th ed.). Morgan Kaufmann. — Cache hierarchy design, cost modeling, and performance analysis methodology.
+
+2. **gem5 Simulator Documentation.** https://www.gem5.org/documentation/ — MinorCPU model, memory system configuration, and statistics interpretation.
+
+3. **SPEC CPU2006 Benchmark Suite.** Standard Performance Evaluation Corporation. https://www.spec.org/cpu2006/ — Benchmark workload characteristics and reference inputs.
+
+4. **Binkert, N., et al.** (2011). *The gem5 Simulator.* ACM SIGARCH Computer Architecture News, 39(2), 1-7. — gem5 architectural simulation framework.
+
+5. **WikiChip - Intel Skylake Microarchitecture.** https://en.wikichip.org/wiki/intel/microarchitectures/skylake_(client) — SRAM cell area analysis (8T vs 6T) for cost model validation.
+
+6. **JEDEC Standard JESD79-3F** (2012). *DDR3 SDRAM Standard.* — DDR3 timing parameters (tCK, tCL, tRCD) used in memory configuration.
+
+---
+
 <div align="center">
 
 **Computer Architecture Lab - Bonus Assignment**
-
-*Performance analysis through simulation enables us to understand the complex interplay between processor microarchitecture and memory hierarchy design decisions.*
 
 </div>
