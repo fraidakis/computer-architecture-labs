@@ -663,7 +663,7 @@ $$
 Combining all components:
 
 $$
-\boxed{C_{total} = \underbrace{(S_{L1} \cdot \gamma_{L1}) + (S_{L2} \cdot \gamma_{L2})}_{\text{Data Array Cost}} + \underbrace{\sum_{i=L1,L2} \left( \frac{S_{i}}{CL} \cdot (T_{w,i} + \sigma_i) \cdot \gamma_{i} \cdot (1 + \delta \cdot W_i) \right)}_{\text{Tag \& Logic Overhead}}}
+\boxed{C_{total} = \underbrace{(S_{L1} \cdot \gamma_{L1}) + (S_{L2} \cdot \gamma_{L2})}_{\text{Data Array Cost}} + \underbrace{\sum_{i=L1,L2} \left( \frac{S_{i}}{CL} \cdot (T_{w,i} + \sigma_i) \cdot \gamma_{i} \cdot (1 + \delta \cdot W_i) \right)}_{\text{Tag and Logic Overhead}}}
 $$
 
 **Parameter Values:**
