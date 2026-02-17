@@ -35,21 +35,21 @@
 
 ### Question 1: System Parameters
 
-The following system parameters were extracted from the gem5 configuration files (`config.ini`):
+The following system parameters were extracted from the gem5 configuration files ([`config.ini`](results/default/specbzip/config.ini)):
 
 #### Cache Configuration
 
 | Component | Size | Associativity | Block Size | Latency |
 |-----------|------|---------------|------------|---------|
-| **L1 Instruction Cache** | 32 KB | 2-way | 64 bytes | 2 cycles |
-| **L1 Data Cache** | 64 KB | 2-way | 64 bytes | 2 cycles |
-| **L2 Cache** | 2 MB | 8-way | 64 bytes | 20 cycles |
+| [**L1 Instruction Cache**](results/default/specbzip/config.ini#L789) | 32 KB | 2-way | 64 bytes | 2 cycles |
+| [**L1 Data Cache**](results/default/specbzip/config.ini#L155) | 64 KB | 2-way | 64 bytes | 2 cycles |
+| [**L2 Cache**](results/default/specbzip/config.ini#L994) | 2 MB | 8-way | 64 bytes | 20 cycles |
 
-#### Memory Subsystem
+#### [Memory Subsystem](results/default/specbzip/config.ini#L1062)
 
 | Parameter | Value |
 |-----------|-------|
-| **Main Memory Type** | DDR3_1600_x64 |
+| [**Main Memory Type**](results/default/specbzip/config.dot#L216) | DDR3_1600_x64 |
 | **Memory Capacity** | 512 MB |
 | **Memory Clock Period (tCK)** | 1250 ps (800 MHz) |
 | **CAS Latency (tCL)** | 13.75 ns |
@@ -61,19 +61,19 @@ The following system parameters were extracted from the gem5 configuration files
 
 | Clock Domain | Period | Frequency |
 |--------------|--------|-----------|
-| **System Clock** (`system.clk_domain`) | 1000 ps | 1 GHz |
-| **CPU Clock** (`system.cpu_clk_domain`) | 500 ps | 2 GHz |
+| [**System Clock**](results/default/specbzip/config.ini#L44) (`system.clk_domain`) | 1000 ps | 1 GHz |
+| [**CPU Clock**](results/default/specbzip/config.ini#L973) (`system.cpu_clk_domain`) | 500 ps | 2 GHz |
 
 #### CPU Configuration
 
 | Parameter | Value |
 |-----------|-------|
-| **CPU Type** | MinorCPU (in-order pipeline) |
+| [**CPU Type**](results/default/specbzip/config.ini#L52) | MinorCPU (in-order pipeline) |
 | **Max Instructions** | 100,000,000 |
 | **Execute Commit Limit** | 2 instructions/cycle |
 | **Execute Issue Limit** | 2 instructions/cycle |
 | **Decode Input Width** | 2 |
-| **Branch Predictor** | TournamentBP (8192 entries) |
+| [**Branch Predictor**](results/default/specbzip/config.ini#L124) | TournamentBP (8192 entries) |
 
 ---
 
@@ -142,29 +142,29 @@ The simulation results highlight a **massive disparity in performance**, driven 
 ##### 3. The "Streaming" Workload (lbm)
 
 **lbm** (CPI = 3.494)
-- Lattice Boltzmann fluid dynamics simulation with large array operations
-- **L1 Miss (6.1%):** Manageable — hardware prefetcher helps with sequential data
-- **L2 Miss (99.99%):** Catastrophic — dataset far exceeds L2 capacity
-- **Bottleneck:** Memory Bandwidth. L2 becomes a "pass-through" buffer; performance limited by RAM throughput.
+- Lattice Boltzmann fluid dynamics simulation with large array operations (massive 3D grid, hundreds of megabytes)
+- **L1 Miss (6.1%):** Manageable: hardware prefetcher helps with sequential data
+- **L2 Miss (99.99%):** Catastrophic: dataset far exceeds L2 capacity
+- **Bottleneck:** Memory Bandwidth. L2 becomes a "pass-through" buffer, performance limited by RAM throughput.
 
 ##### 4. The "Thrashing" Anomaly (sjeng)
 
 **sjeng** (Worst performer, CPI = 10.271)
 - Chess engine with complex data structures (game trees, hash tables)
-- **L1 Miss (12.18%):** Highest in suite — random tree traversals defeat spatial locality
-- **L2 Miss (99.99%):** Effectively 100%
-- **The Compound Effect:** High L1 misses + 100% L2 misses = massive volume of DRAM requests. Memory bandwidth saturates, and DRAM latency dominates execution time.
+- **L1 Miss (12.18%):** Highest in suite: random tree traversals defeat spatial locality
+- **L2 Miss (99.99%):** Catastrophic: random access patterns prevent any successful caching
+- **The Compound Effect:** High L1 misses + 100% L2 misses = frequent stalls. The CPU constantly waits for data, exposing the full DRAM access latency.
 - **Bottleneck:** Memory Latency. CPU stalls on almost every memory instruction.
 
 #### Architectural Bottleneck Summary
 
 | Benchmark | Classification | Primary Bottleneck |
 |-----------|----------------|-------------------|
-| **hmmer** | Compute-Bound | None — excellent locality keeps pipeline full |
+| **hmmer** | Compute-Bound | None - excellent locality keeps pipeline full |
 | **mcf** | Compute/Branch-Bound | Branch prediction (2.36% L1i miss rate) |
 | **bzip2** | Mixed | L2 capacity (28% miss rate) |
 | **lbm** | Bandwidth-Bound | L2 capacity & memory bandwidth (99.99% L2 miss) |
-| **sjeng** | Latency-Bound | Memory latency — stalling on nearly every access |
+| **sjeng** | Latency-Bound | Memory latency - stalling on nearly every access |
 
 ---
 
@@ -176,9 +176,9 @@ Three configurations were tested using `--cpu-clock` parameter:
 
 | Configuration | `system.clk_domain.clock` | `cpu_clk_domain.clock` | CPU Frequency |
 | :--- | :---: | :---: | :---: |
-| **1 GHz Test** | 1000 ps (1 GHz) | 1000 ps | **1 GHz** |
-| **Default** | 1000 ps (1 GHz) | 500 ps | **2 GHz** |
-| **4 GHz Test** | 1000 ps (1 GHz) | 250 ps | **4 GHz** |
+| [**1 GHz Test**](results/1GHz/specbzip/config.ini) | 1000 ps (1 GHz) | 1000 ps | **1 GHz** |
+| [**Default**](results/default/specbzip/config.ini) | 1000 ps (1 GHz) | 500 ps | **2 GHz** |
+| [**4 GHz Test**](results/4GHz/specbzip/config.ini) | 1000 ps (1 GHz) | 250 ps | **4 GHz** |
 
 > **Key Finding:** The `system.clk_domain` remains constant at 1 GHz across all tests, while only `cpu_clk_domain` changes with the `--cpu-clock` parameter.
 
@@ -229,7 +229,7 @@ Three configurations were tested using `--cpu-clock` parameter:
 #### Scaling Efficiency Visualization
 
 ![Scaling Efficiency vs Cache Miss Rate](plots/task1/scaling_vs_cache_miss.png)
-*Figure 3: Strong negative correlation ($\rho = -0.99$) between L2 miss rate and frequency scaling efficiency. Higher cache misses = worse scaling.*
+*Figure 3: Strong negative correlation (ρ = -0.99) between L2 miss rate and frequency scaling efficiency. Higher cache misses = worse scaling.*
 
 > **Key Insight:** L2 miss rate is the **single best predictor** of frequency scaling efficiency. Benchmarks with <30% L2 miss rate achieve >85% scaling efficiency.
 
@@ -261,7 +261,7 @@ Three configurations were tested using `--cpu-clock` parameter:
 
 Benchmarks were re-run with upgraded memory to evaluate the impact of faster DRAM:
 
-| Memory Technology | DDR3_1600_x64 (Baseline) | DDR3_2133_x64 (Upgraded) |
+| Memory Technology | [DDR3_1600_x64 (Baseline)](results/default/specbzip/config.ini) | [DDR3_2133_x64 (Upgraded)](results/DDR3_2133_8x8/specbzip/config.ini) |
 |-------------------|--------------------------|--------------------------|
 | **Memory Clock** | 800 MHz | 1066 MHz |
 | **Peak Bandwidth** | 12.8 GB/s | 17.0 GB/s |
@@ -273,16 +273,16 @@ Benchmarks were re-run with upgraded memory to evaluate the impact of faster DRA
 
 #### DDR3_2133 Benchmark Results
 
-| Benchmark | Sim Time (s) | CPI | L2 Miss Rate | Improvement |
-|-----------|--------------|-----|--------------|-------------|
-| **401.bzip2** | 0.083597 | 1.6719 | 28.22% | **0.48%** |
-| **429.mcf** | 0.064545 | 1.2909 | 5.51% | **0.24%** |
-| **456.hmmer** | 0.059383 | 1.1877 | 7.82% | **0.02%** |
-| **458.sjeng** | 0.493128 | 9.8626 | 99.99% | **3.97%** |
-| **470.lbm** | 0.171529 | 3.4306 | 99.99% | **1.81%** |
+| Benchmark | Sim Time (s) | CPI | Improvement |
+|-----------|--------------|-----|-------------|
+| **401.bzip2** | 0.083597 | 1.6719 | **0.48%** |
+| **429.mcf** | 0.064545 | 1.2909 | **0.24%** |
+| **456.hmmer** | 0.059383 | 1.1877 | **0.02%** |
+| **458.sjeng** | 0.493128 | 9.8626 | **3.97%** |
+| **470.lbm** | 0.171529 | 3.4306 | **1.81%** |
 
-![Memory Upgrade Benefit](plots/task1/memory_improvement_vs_l2miss.png)
-*Figure 4: Memory upgrade benefit correlates positively with L2 miss rate.*
+![Memory Upgrade Benefit](plots/task1/memory_improvement_vs_effective_miss.png)
+*Figure 4: Memory upgrade benefit correlates strongly with effective DRAM miss rate (L1d × L2 / 100, log-scale x-axis).*
 
 > **Expected Behavior Confirmed:** Cache miss rates remain **identical** between memory technologies — miss rates depend on access patterns and cache hierarchy design, not memory speed.
 
@@ -290,21 +290,19 @@ Benchmarks were re-run with upgraded memory to evaluate the impact of faster DRA
 
 #### Performance Improvement Analysis
 
-##### Improvement vs. L2 Miss Rate Correlation
+##### Improvement vs. Effective DRAM Miss Rate Correlation
 
-| Benchmark | L2 Miss Rate | CPI Improvement | Classification |
-|-----------|--------------|-----------------|----------------|
-| **hmmer** | 7.82% | 0.02% | 🟢 Compute-bound |
-| **mcf** | 5.51% | 0.24% | 🟢 Compute-bound |
-| **bzip2** | 28.22% | 0.48% | 🟡 Mixed |
-| **lbm** | 99.99% | 1.81% | 🔴 Memory-bound |
-| **sjeng** | 99.99% | 3.97% | 🔴 Severely Memory-bound |
+L2 miss rate alone poorly predicts memory upgrade benefit — sjeng and lbm both have 99.99% L2 miss rate but very different improvements. Instead, we use **Effective DRAM Miss Rate = L1d Miss × L2 Miss / 100**, which captures the actual fraction of instructions reaching main memory.
 
-##### Why sjeng Benefits More Than lbm (Both Have 99.99% L2 Miss Rate)?
+| Benchmark | L1d Miss | L2 Miss | Effective DRAM Miss | CPI Improvement | Classification |
+|-----------|----------|---------|--------------------:|----------------:|----------------|
+| **hmmer** | 0.16% | 7.82% | 0.013 | 0.02% | 🟢 Compute-bound |
+| **mcf** | 0.21% | 5.51% | 0.012 | 0.24% | 🟢 Compute-bound |
+| **bzip2** | 1.48% | 28.22% | 0.418 | 0.48% | 🟡 Mixed |
+| **lbm** | 6.10% | 99.99% | 6.099 | 1.81% | 🔴 Memory-bound |
+| **sjeng** | 12.18% | 99.99% | 12.179 | 3.97% | 🔴 Severely Memory-bound |
 
-Despite identical L2 miss rates, **sjeng gains 2× more** from faster memory than lbm because of **L1d miss rate differences**: sjeng has 12.18% L1d miss rate vs lbm's 6.10%, meaning sjeng generates **2× more memory requests** that can benefit from faster DRAM.
-
-**Key Insight:** The **volume of memory traffic** (driven by L1 miss rate) determines memory upgrade benefit when L2 miss rates are equal.
+This combined metric yields a near-perfect correlation (**ρ = 0.99, R² = 0.99**), confirming that the **volume of memory traffic reaching DRAM** determines memory upgrade benefit.
 
 ---
 

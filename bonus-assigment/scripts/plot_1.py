@@ -114,8 +114,8 @@ print(f"✓ Created: cpi_simtime_dual_axis.png")
 # =============================================================================
 fig, ax = plt.subplots(figsize=(8, 6))
 
-miss_data = np.array([l1d_miss, l1i_miss, l2_miss]).T
-cache_levels = ['L1 Data', 'L1 Instruction', 'L2']
+miss_data = np.array([l1i_miss, l1d_miss, l2_miss]).T
+cache_levels = ['L1 Instruction', 'L1 Data', 'L2']
 
 import matplotlib.colors as mcolors
 norm = mcolors.LogNorm(vmin=0.001, vmax=100)
@@ -305,15 +305,19 @@ plt.close()
 print(f"✓ Created: scaling_vs_cache_miss.png")
 
 # =============================================================================
-# Question 4: Memory Technology Impact - Improvement vs L2 Miss Rate
+# Question 4: Memory Technology Impact - Improvement vs Effective DRAM Miss Rate
 # =============================================================================
 
-# Data: DDR3_1600 (Baseline) vs DDR3_2133 (Upgraded) - sorted by L2 miss rate
+# Data: DDR3_1600 (Baseline) vs DDR3_2133 (Upgraded) - sorted by effective miss rate
 benchmarks_mem = ['hmmer', 'mcf', 'bzip2', 'lbm', 'sjeng']
 cpi_1600 = [1.1879, 1.2940, 1.6800, 3.4938, 10.2705]
 cpi_2133 = [1.1877, 1.2909, 1.6719, 3.4306, 9.8626]
 l2_miss_mem = [7.82, 5.51, 28.22, 99.99, 99.99]
 l1d_miss_mem = [0.16, 0.21, 1.48, 6.10, 12.18]
+
+# Combined metric: effective DRAM miss rate = L1d_miss × L2_miss / 100
+# This captures the fraction of instructions that actually reach main memory
+effective_miss = [l1d * l2 / 100 for l1d, l2 in zip(l1d_miss_mem, l2_miss_mem)]
 
 # Calculate improvements
 improvement = [(old - new) / old * 100 for old, new in zip(cpi_1600, cpi_2133)]
@@ -323,48 +327,51 @@ fig, ax = plt.subplots(figsize=(12, 8))
 ax.set_facecolor('#fafbfc')
 fig.patch.set_facecolor('white')
 
-# Background zones
-compute_zone = Rectangle((0, -0.5), 30, 5, linewidth=0, 
+# Use log scale for x-axis to spread out the compute-bound benchmarks
+ax.set_xscale('log')
+
+# Background zones (in log space: 0.005–0.5 compute, 0.5–15 memory)
+compute_zone = Rectangle((0.005, -0.5), 0.495, 5.8, linewidth=0, 
                           facecolor=colors['accent'], alpha=0.12)
 ax.add_patch(compute_zone)
-memory_zone = Rectangle((30, -0.5), 80, 5, linewidth=0, 
+memory_zone = Rectangle((0.5, -0.5), 14.5, 5.8, linewidth=0, 
                          facecolor=colors['danger'], alpha=0.12)
 ax.add_patch(memory_zone)
 
 # Zone labels
-ax.text(15, 4.3, 'COMPUTE-BOUND', fontsize=10, fontweight='bold', 
+ax.text(0.07, 4.3, 'COMPUTE-BOUND', fontsize=10, fontweight='bold', 
         ha='center', color=colors['accent'], alpha=0.8)
-ax.text(70, 4.3, 'MEMORY-BOUND', fontsize=10, fontweight='bold', 
+ax.text(4.0, 4.3, 'MEMORY-BOUND', fontsize=10, fontweight='bold', 
         ha='center', color=colors['danger'], alpha=0.8)
 
 # Divider line
-ax.axvline(x=30, color='#cbd5e1', linestyle='--', linewidth=1.5, alpha=0.7)
+ax.axvline(x=0.5, color='#cbd5e1', linestyle='--', linewidth=1.5, alpha=0.7)
 
 # Custom colormap
 custom_cmap = LinearSegmentedColormap.from_list('improvement', 
     ['#94a3b8', '#f59e0b', '#ef4444', '#dc2626'], N=256)
 
-# Bubble sizes based on L1d miss rate (traffic volume indicator)
-bubble_sizes = [m * 80 + 200 for m in l1d_miss_mem]
+# Fixed bubble size
+bubble_sizes = [400] * len(benchmarks_mem)
 
 # Shadow layer
-ax.scatter(l2_miss_mem, improvement, s=[s * 1.5 for s in bubble_sizes], 
+ax.scatter(effective_miss, improvement, s=[s * 1.5 for s in bubble_sizes], 
            c=improvement, cmap=custom_cmap, alpha=0.12, 
            vmin=0, vmax=4.5, zorder=1)
 
 # Main bubbles
-scatter = ax.scatter(l2_miss_mem, improvement, s=bubble_sizes, 
+scatter = ax.scatter(effective_miss, improvement, s=bubble_sizes, 
                      c=improvement, cmap=custom_cmap, alpha=0.9, 
                      edgecolors='white', linewidths=2.5, 
                      vmin=0, vmax=4.5, zorder=2)
 
-# Adjusted label configurations per user request
+# Label configurations adjusted for log-scale x-axis
 label_configs_mem = {
-    'hmmer': {'offset': (15, -8), 'ha': 'left'},
-    'mcf': {'offset': (12, 20), 'ha': 'left'},       # top right, moved up
-    'bzip2': {'offset': (18, -12), 'ha': 'left'},    # more down and right
-    'lbm': {'offset': (-20, 12), 'ha': 'right'},
-    'sjeng': {'offset': (-28, -10), 'ha': 'right'}   # more left
+    'hmmer': {'offset': (15, -12), 'ha': 'left'},
+    'mcf': {'offset': (-15, 14), 'ha': 'right'},
+    'bzip2': {'offset': (-18, 16), 'ha': 'right'},
+    'lbm': {'offset': (-24, 17), 'ha': 'right'},
+    'sjeng': {'offset': (-28, -16), 'ha': 'right'}
 }
 
 for i, benchmark in enumerate(benchmarks_mem):
@@ -385,24 +392,25 @@ for i, benchmark in enumerate(benchmarks_mem):
         bg_color = '#fee2e2'
         edge_color = '#ef4444'
     
-    # Simplified annotation: benchmark name and improvement (no L1d, no +)
+    # Annotation: benchmark name and improvement
     ax.annotate(f'{benchmark}\n{imp_val:.2f}%', 
-                (l2_miss_mem[i], improvement[i]),
+                (effective_miss[i], improvement[i]),
                 xytext=config['offset'], textcoords='offset points',
                 fontsize=10, fontweight='bold', ha=config['ha'], va='center',
+                multialignment='center',
                 color=label_color,
                 bbox=dict(boxstyle='round,pad=0.4', facecolor=bg_color, 
                          alpha=0.95, edgecolor=edge_color, linewidth=1.5),
                 zorder=3)
 
-# Trend line with R² value
-z = np.polyfit(l2_miss_mem, improvement, 1)
+# Trend line with R² value (fit in linear space, curves naturally on log axis)
+z = np.polyfit(effective_miss, improvement, 1)
 p = np.poly1d(z)
-x_line = np.linspace(0, 110, 200)  # Stay within plot area
+x_line = np.logspace(np.log10(0.005), np.log10(20), 200)
 y_line = p(x_line)
 
-# R² calculation
-correlation_mem = np.corrcoef(l2_miss_mem, improvement)[0, 1]
+# R² calculation (linear space)
+correlation_mem = np.corrcoef(effective_miss, improvement)[0, 1]
 r_squared = correlation_mem ** 2
 
 # Trend line
@@ -410,23 +418,20 @@ ax.plot(x_line, y_line, '-', color='#8b5cf6', linewidth=4, alpha=0.15, zorder=0)
 ax.plot(x_line, y_line, '--', color='#7c3aed', linewidth=2.5, alpha=0.85, 
         label=f'Trend (R² = {r_squared:.2f}, ρ = {correlation_mem:.2f})', zorder=1)
 
-# Colorbar
-cbar = plt.colorbar(scatter, ax=ax, shrink=0.75, pad=0.02)
-cbar.set_label('CPI Improvement (%)', fontsize=11, fontweight='bold')
-cbar.outline.set_linewidth(0.5)
+
 
 # Labels and title
-ax.set_xlabel('L2 Cache Miss Rate (%)', fontsize=13, fontweight='bold', labelpad=12)
+ax.set_xlabel('Effective DRAM Miss Rate  (L1d Miss × L2 Miss / 100)', fontsize=13, fontweight='bold', labelpad=12)
 ax.set_ylabel('CPI Improvement from Memory Upgrade (%)', fontsize=13, fontweight='bold', labelpad=12)
 ax.set_title('Memory Upgrade Benefit: DDR3_1600 → DDR3_2133 (+33% Bandwidth)', 
-             fontsize=16, fontweight='bold', pad=20, color='#1e293b')
+             fontsize=16, fontweight='bold', pad=30, color='#1e293b')
 
 # Subtitle
-ax.text(0.5, 1.015, f'Positive correlation (ρ = {correlation_mem:.2f}) · Bubble size ∝ L1d Miss Rate (memory traffic)',
+ax.text(0.5, 1.03, f'Strong correlation (ρ = {correlation_mem:.2f}) · X-axis combines L1d & L2 miss rates',
         transform=ax.transAxes, fontsize=10, ha='center', va='top', 
         color='#64748b', fontstyle='italic')
 
-ax.set_xlim(-5, 115)
+ax.set_xlim(0.005, 20)
 ax.set_ylim(-0.3, 4.8)
 
 # Styling
@@ -442,9 +447,9 @@ ax.legend(loc='upper left', fontsize=10, framealpha=0.95,
           facecolor='white', edgecolor='#e2e8f0')
 
 plt.tight_layout()
-plt.savefig(output_dir / 'memory_improvement_vs_l2miss.png', dpi=200, bbox_inches='tight',
+plt.savefig(output_dir / 'memory_improvement_vs_effective_miss.png', dpi=200, bbox_inches='tight',
             facecolor='white', edgecolor='none')
 plt.close()
-print(f"✓ Created: memory_improvement_vs_l2miss.png")
+print(f"✓ Created: memory_improvement_vs_effective_miss.png")
 
 print(f"\n✅ All plots saved to: {output_dir.resolve()}")

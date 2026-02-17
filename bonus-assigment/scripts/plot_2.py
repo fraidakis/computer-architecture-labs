@@ -7,9 +7,6 @@ Professional plotting for gem5 SPEC benchmark results.
 Generates:
 1. Configuration Scatter Plot (L1d size vs CPI)
 2. Per-benchmark CPI Progression Curves
-
-Author: Auto-generated
-Date: 2025-12-31
 """
 
 import os
