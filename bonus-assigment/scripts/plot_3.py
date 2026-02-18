@@ -274,12 +274,16 @@ def calculate_cost_breakdown(config: Dict) -> Dict[str, float]:
     c_data_l2 = l2_kb * p['GAMMA_L2']
     c_data = c_data_l1 + c_data_l2
     
-    # Tag & Logic Overhead (simplified calculation for display)
-    total_kb = l1_total_kb + l2_kb
+    # Tag & Logic Overhead (full per-cache calculation, same as calculate_cost)
     avg_ways = (config['L1i_assoc'] + config['L1d_assoc'] + config['L2_assoc']) / 3
-    
-    # Simplified tag overhead using proxy formula: S_total × (A_w / CL) × (1 + δ × W̄)
-    tag_overhead = total_kb * (p['ADDR_WIDTH'] / cl) * (1 + p['DELTA'] * avg_ways)
+    tag_overhead = 0.0
+    for sz, assoc, gamma in [(l1i_kb, config['L1i_assoc'], p['GAMMA_L1']),
+                              (l1d_kb, config['L1d_assoc'], p['GAMMA_L1']),
+                              (l2_kb, config['L2_assoc'], p['GAMMA_L2'])]:
+        tw = calculate_tag_width(sz, cl, assoc)
+        st = calculate_status_bits(assoc)
+        nlines = (sz * 1024) / cl
+        tag_overhead += nlines * (tw + st) * gamma * (1 + p['DELTA'] * assoc) / (8 * 1024)
     
     total = c_data + tag_overhead
     

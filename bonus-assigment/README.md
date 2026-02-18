@@ -650,7 +650,7 @@ $$
 For optimization loops where the full bit-level calculation is cumbersome, we derive a **calibrated approximation**:
 
 $$
-\boxed{C_{approx} = 2.0 \cdot S_{L1} + 1.0 \cdot S_{L2} + S_{total} \times \frac{A_w}{CL} \times (1 + 0.05 \cdot \overline{W})}
+\boxed{C_{approx} = 2.0 \cdot S_{L1} + 1.0 \cdot S_{L2} + S_{total} \times \frac{A_w}{CL \times 8} \times (1 + 0.05 \cdot \overline{W})}
 $$
 
 **Where:**
@@ -665,7 +665,7 @@ $$
 |-----------|-----------------|------------------|
 | $2.0 \cdot S_{L1}$ | L1 Data Array | 8T cells are 2× larger |
 | $1.0 \cdot S_{L2}$ | L2 Data Array | 6T baseline |
-| $\frac{A_w}{CL}$ | Tag Overhead | Larger lines → fewer tags |
+| $\frac{A_w}{CL \times 8}$ | Tag Overhead | Larger lines → fewer tags |
 | $(1 + 0.05 \cdot W)$ | Logic Overhead | ~5% per way on overhead only |
 
 ---
@@ -689,16 +689,16 @@ Using the physical model: $C = 2 \cdot S_{L1} + S_{L2} + \text{TagOverhead}$
 
 | Benchmark | Configuration | Data Cost | Tag Overhead | **Total Cost** | **CPI** | **CPI × Cost** |
 |-----------|---------------|-----------|--------------|----------------|---------|----------------|
-| **spechmmer** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 1.191 | 3,918 |
-| | Optimized (192KB L1, 512KB, 256B, 8-way) | 896 | 78 | 974 | **1.177** | **1,148** |
-| **specmcf** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 1.294 | 4,257 |
-| | Optimized (128KB L1, 2MB, 512B, 4-way) | 2,256 | 135 | 2,391 | **1.105** | **2,642** |
-| **specbzip** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 1.712 | 5,632 |
-| | Optimized (160KB L1, 4MB, 256B, 16-way) | 4,320 | 210 | 4,530 | **1.589** | **7,194** |
-| **speclibm** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 3.494 | 11,496 |
-| | Optimized (**32KB L1, 128KB L2**, 2048B, 1-way) | **192** | **3** | **195** | **1.496** | **292** |
-| **specsjeng** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 1,050 | 3,290 | 10.271 | 33,792 |
-| | Optimized (160KB L1, 512KB L2, 2048B, 4-way) | 832 | 11 | 843 | **3.072** | **2,590** |
+| **spechmmer** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 1.188 | 2,798 |
+| | Optimized (128KB L1, 512KB, 256B, 2-way) | 768 | 8 | 776 | **1.177** | **914** |
+| **specmcf** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 1.294 | 3,047 |
+| | Optimized (96KB L1, 2MB, 512B, 4-way) | 2,240 | 14 | 2,254 | **1.105** | **2,491** |
+| **specbzip** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 1.680 | 3,956 |
+| | Optimized (160KB L1, 4MB, 256B, 16-way) | 4,416 | 78 | 4,494 | **1.589** | **7,141** |
+| **speclibm** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 3.494 | 8,228 |
+| | Optimized (**32KB L1, 128KB L2**, 2048B, 1-way) | **192** | **0.2** | **192** | **1.496** | **288** |
+| **specsjeng** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 10.271 | 24,188 |
+| | Optimized (144KB L1, 512KB L2, 2048B, 4-way) | 800 | 1 | 801 | **3.072** | **2,461** |
 
 ---
 
