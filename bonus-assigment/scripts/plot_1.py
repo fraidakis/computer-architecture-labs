@@ -319,7 +319,7 @@ l1d_miss_mem = [0.16, 0.21, 1.48, 6.10, 12.18]
 # This captures the fraction of instructions that actually reach main memory
 effective_miss = [l1d * l2 / 100 for l1d, l2 in zip(l1d_miss_mem, l2_miss_mem)]
 
-# Calculate improvements
+# Calculate improvements (sim time improvement = CPI improvement since instructions are fixed)
 improvement = [(old - new) / old * 100 for old, new in zip(cpi_1600, cpi_2133)]
 
 fig, ax = plt.subplots(figsize=(12, 8))
@@ -422,7 +422,7 @@ ax.plot(x_line, y_line, '--', color='#7c3aed', linewidth=2.5, alpha=0.85,
 
 # Labels and title
 ax.set_xlabel('Effective DRAM Miss Rate  (L1d Miss × L2 Miss / 100)', fontsize=13, fontweight='bold', labelpad=12)
-ax.set_ylabel('CPI Improvement from Memory Upgrade (%)', fontsize=13, fontweight='bold', labelpad=12)
+ax.set_ylabel('Simulation Time Improvement from Memory Upgrade (%)', fontsize=13, fontweight='bold', labelpad=12)
 ax.set_title('Memory Upgrade Benefit: DDR3_1600 → DDR3_2133 (+33% Bandwidth)', 
              fontsize=16, fontweight='bold', pad=30, color='#1e293b')
 

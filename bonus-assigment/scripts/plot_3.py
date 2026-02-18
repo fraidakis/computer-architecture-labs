@@ -162,9 +162,9 @@ OPTIMAL_CONFIGS = {
 }
 
 DEFAULT_CPIS = {
-    'spechmmer': 1.191,
+    'spechmmer': 1.188,
     'specmcf': 1.294,
-    'specbzip': 1.712,
+    'specbzip': 1.680,
     'speclibm': 3.494,
     'specsjeng': 10.271,
 }

@@ -162,7 +162,7 @@ def plot_cpi_progression_per_benchmark():
                   edgecolors='#FFFFFF', linewidth=2.5, zorder=15, label='Baseline')
         
         # Baseline reference line with style
-        baseline_mask = bench_data['config'].astype(str).str.contains('baseline|cfg1', case=False)
+        baseline_mask = bench_data['config'].astype(str).str.contains('baseline|baseline', case=False)
         if baseline_mask.any():
             default_cpi = bench_data.loc[baseline_mask, 'cpi'].values[0]
             ax.hlines(y=default_cpi, xmin=x[0]-0.3, xmax=x[-1]+0.3, 
@@ -289,7 +289,7 @@ def plot_optimization_impact():
         df = data[bench]
         bench_names.append(bench)
         
-        baseline_mask = df['Benchmarks'].str.contains('baseline|cfg1', case=False, na=False)
+        baseline_mask = df['Benchmarks'].str.contains('baseline|baseline', case=False, na=False)
         if baseline_mask.any():
             baseline_cpi.append(df.loc[baseline_mask, 'system.cpu.cpi'].values[0])
         else:
@@ -385,7 +385,7 @@ def plot_workload_classification():
             continue
         df = data[bench]
         
-        baseline_mask = df['Benchmarks'].str.contains('baseline|cfg1', case=False, na=False)
+        baseline_mask = df['Benchmarks'].str.contains('baseline|baseline', case=False, na=False)
         if baseline_mask.any():
             l2_miss = df.loc[baseline_mask, 'system.l2.overall_miss_rate::total'].values[0]
             baseline_cpi = df.loc[baseline_mask, 'system.cpu.cpi'].values[0]

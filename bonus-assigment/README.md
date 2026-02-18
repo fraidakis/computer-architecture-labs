@@ -273,14 +273,6 @@ Benchmarks were re-run with upgraded memory to evaluate the impact of faster DRA
 
 #### DDR3_2133 Benchmark Results
 
-| Benchmark | Sim Time (s) | CPI | Improvement |
-|-----------|--------------|-----|-------------|
-| **401.bzip2** | 0.083597 | 1.6719 | **0.48%** |
-| **429.mcf** | 0.064545 | 1.2909 | **0.24%** |
-| **456.hmmer** | 0.059383 | 1.1877 | **0.02%** |
-| **458.sjeng** | 0.493128 | 9.8626 | **3.97%** |
-| **470.lbm** | 0.171529 | 3.4306 | **1.81%** |
-
 ![Memory Upgrade Benefit](plots/task1/memory_improvement_vs_effective_miss.png)
 *Figure 4: Memory upgrade benefit correlates strongly with effective DRAM miss rate (L1d × L2 / 100, log-scale x-axis).*
 
@@ -294,7 +286,7 @@ Benchmarks were re-run with upgraded memory to evaluate the impact of faster DRA
 
 L2 miss rate alone poorly predicts memory upgrade benefit — sjeng and lbm both have 99.99% L2 miss rate but very different improvements. Instead, we use **Effective DRAM Miss Rate = L1d Miss × L2 Miss / 100**, which captures the actual fraction of instructions reaching main memory.
 
-| Benchmark | L1d Miss | L2 Miss | Effective DRAM Miss | CPI Improvement | Classification |
+| Benchmark | L1d Miss | L2 Miss | Effective DRAM Miss | Improvement | Classification |
 |-----------|----------|---------|--------------------:|----------------:|----------------|
 | **hmmer** | 0.16% | 7.82% | 0.013 | 0.02% | 🟢 Compute-bound |
 | **mcf** | 0.21% | 5.51% | 0.012 | 0.24% | 🟢 Compute-bound |
@@ -316,9 +308,9 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 | Benchmark | Default CPI | Optimized CPI | Improvement | Key Optimization |
 |-----------|-------------|---------------|-------------|------------------|
-| **spechmmer** | 1.191 | **1.177** | +1.18% | 256B cacheline, 64kB L1i, 128kB L1d |
-| **specmcf** | 1.162 | **1.105** | +4.91% | 512B cacheline |
-| **specbzip** | 1.712 | **1.589** | +7.18% | 256B cacheline, 128kB L1d, 4MB L2, 16-way assoc |
+| **spechmmer** | 1.188 | **1.177** | +0.93% | 256B cacheline, 64kB L1i, 128kB L1d |
+| **specmcf** | 1.294 | **1.105** | +14.61% | 512B cacheline |
+| **specbzip** | 1.680 | **1.589** | +5.42% | 256B cacheline, 128kB L1d, 4MB L2, 16-way assoc |
 | **speclibm** | 3.494 | **1.496** | +57.18% | 2048B cacheline (extreme) |
 | **specsjeng** | 10.271 | **3.072** | +70.09% | 2048B cacheline, 128kB L1d, 4-way assoc |
 
@@ -341,10 +333,10 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
-| baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.19 | **Default Config** — establishes baseline performance |
+| baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.188 | **Default Config** — establishes baseline performance |
 | minimal | 32kB | 32kB | 512kB | 2/2/4 | 64B | 1.191 | **Minimal viable config** — establishes lower bound for cache sizes |
 | +L1d | 32kB | **64kB** | 512kB | 2/2/4 | 64B | 1.188 | **Double L1d** — tests if L1d capacity is limiting factor |
-| +L1d=128 | 32kB | **128kB** | 512kB | 2/8/4 | 64B | 1.185 | **Max L1d + higher assoc** — pushes L1d to limit; 8-way reduces conflicts |
+| +L1d=128 | 32kB | **128kB** | 512kB | 2/8/4 | 64B | 1.185 | **Max L1d + higher assoc** — pushes L1d to limit, 8-way reduces conflicts |
 | +128B | 32kB | 128kB | 512kB | 2/8/4 | **128B** | 1.180 | **Double cacheline** — tests spatial locality exploitation |
 | +256B | 32kB | 128kB | 512kB | 2/8/4 | **256B** | 1.178 | **4× cacheline** — aggressive prefetch for sequential patterns |
 | +L1i | **64kB** | 128kB | 512kB | 2/8/4 | 256B | **1.177** | **Double L1i** — tests if instruction cache was limiting |
@@ -371,31 +363,31 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 - Pointer-chasing access patterns through linked data structures
 - L2 miss rate moderate (5.51%) — working set mostly fits, but irregular accesses cause conflicts
 
-**Optimization Hypothesis:** L1i misses are due to **branch patterns, not capacity** — larger L1i won't help. Larger cachelines may improve pointer-chasing performance by prefetching adjacent graph nodes (due to allocator locality).
+**Optimization Hypothesis:** High L1i miss rate suggests **L1i capacity misses** — increasing L1i should improve performance. Larger cachelines may also improve pointer-chasing performance by prefetching adjacent graph nodes (due to allocator locality).
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
 | baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.29 | **Default Config** — establishes baseline performance |
-| large_l1i | 64kB | 32kB | 512kB | 2/2/4 | 64B | 1.162 | **Larger L1i baseline** — addresses high L1i miss rate observation |
+| large_l1i | 64kB | 32kB | 512kB | 2/2/4 | 64B | 1.162 | **Larger L1i baseline** — addresses high L1i miss rate |
 | +assoc | 64kB | **64kB** | 512kB | 2/4/4 | 64B | 1.160 | **Double L1d + 4-way** — tests L1d impact in isolation |
 | balanced | 64kB | 64kB | **2MB** | 4/4/8 | 64B | 1.152 | **Balanced config** — moderate investments across hierarchy |
-| +128B | 64kB | 64kB | 2MB | 4/4/8 | **128B** | 1.122 | **2× cacheline** — **BREAKTHROUGH!** 2.6% improvement |
+| +128B | 64kB | 64kB | 2MB | 4/4/8 | **128B** | 1.122 | **2× cacheline** — 2.6% improvement from spatial locality |
 | +L2 | 64kB | 64kB | **4MB** | 4/4/16 | 128B | 1.122 | **128B + max L2** — confirms cacheline is dominant |
 | +256B,L1i=2way | 64kB | 64kB | 2MB | 2/4/8 | **256B** | 1.106 | **4× cacheline** — tests aggressive prefetch |
-| +512B | 64kB | 64kB | 2MB | 4/4/8 | **512B** | **1.105** | **8× cacheline** — **BEST!** pointer chains benefit from aggressive prefetch |
+| +512B | 64kB | 64kB | 2MB | 4/4/8 | **512B** | **1.105** | **8× cacheline** — pointer chains benefit from aggressive prefetch |
 
 ---
 
 **Analysis:**
-- **128kB L1i showed ZERO improvement** over 64kB — confirms L1i misses are due to **branch mispredictions**, not capacity
-- **128B cacheline was the breakthrough** — 2.6% improvement from 64B baseline
-- **512B cacheline achieved best CPI (1.105)** — 4.9% total improvement
+- **Doubling L1i to 64kB provided significant speedup** (CPI 1.29 → 1.16) — confirms primary bottleneck was **L1i capacity**
+- **128B cacheline provided further gains** — 2.6% improvement from 64B baseline
+- **512B cacheline achieved best CPI (1.105)** — 14.6% total improvement
 - Why larger cachelines help pointer-chasing:
   - Graph nodes often clustered in memory (allocator locality)
   - Prefetching adjacent nodes reduces miss penalty for linked traversals
   - Larger blocks amortize memory access latency
 
-**Conclusion:** Counter-intuitive result — instruction-bound workload benefits most from data-side optimization (larger cacheline, not larger L1i).
+**Conclusion:** Workload benefits from a **two-pronged approach**: increasing L1i size to resolve instruction capacity misses, and increasing cacheline size to accelerate data pointer chasing.
 
 ---
 
@@ -407,12 +399,12 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 - 1.48% L1d miss rate — moderate but not severe
 - Sequential streaming access pattern during sorting phases
 
-**Optimization Hypothesis:** L2 capacity is the primary bottleneck. Larger L2 + larger cacheline should significantly reduce miss penalty.
+**Optimization Hypothesis:** **L2 capacity is the primary bottleneck** (28% miss rate), but the **moderate L1d miss rate (1.48%)** suggests opportunities for improvement. Larger L1d to capture BWT blocks, combined with larger L2 and cachelines, should reduce miss penalties.
 
 | Config | L1i | L1d | L2 | Assoc (i/d/L2) | Cacheline | CPI | Rationale |
 |--------|-----|-----|-----|----------------|-----------|-----|-----------|
 | baseline | 32kB | 64kB | 2MB | 2/2/8 | 64B | 1.68 | **Default Config** — establishes baseline performance |
-| +L1d | 32kB | **128kB** | 2MB | 2/4/8 | 64B | 1.643 | **Max L1d + 4-way** — reduces L1d miss penalty (+4.0%) |
+| +L1d | 32kB | **128kB** | 2MB | 2/4/8 | 64B | 1.643 | **Max L1d + 4-way** — reduces L1d miss penalty (+2.2%) |
 | +128B | 32kB | 128kB | 2MB | 2/4/8 | **128B** | 1.626 | **2× cacheline** — tests spatial locality benefit (+1.0%) |
 | +256B | 32kB | 128kB | 2MB | 2/4/8 | **256B** | 1.615 | **4× cacheline** — aggressive block sorting prefetch (+0.7%) |
 | +256B,L2=4M | 32kB | 128kB | **4MB** | 2/4/16 | 256B | 1.600 | **Max L2 + 256B** — compound optimization (+0.9%) |
@@ -427,14 +419,6 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 - **128kB L1d** reduced L1d miss rate from 1.48% to 0.93% — captures more BWT blocks
 - **4MB L2** helped capture more of the compression dictionary
 - **16-way L1d associativity** eliminated conflict misses during sorting passes
-
-**Why each optimization helped:**
-| Optimization | Mechanism | Contribution |
-|--------------|-----------|--------------|
-| 128kB L1d | More BWT blocks fit in L1d | -4.0% CPI |
-| 256B cacheline | Prefetch adjacent sorted elements | -2.3% CPI |
-| 4MB L2 | Captures larger portion of dictionary | -0.9% CPI |
-| 16-way assoc | Eliminates sorting-phase conflicts | -0.7% CPI |
 
 **Conclusion:** Data streaming workload benefits from **layered optimizations** — each level of cache hierarchy contributes.
 
@@ -465,7 +449,7 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 **Key Observation:** With 2048B cacheline, **CPI is identical across all cache configurations** (1.496-1.498) — L1d miss rate drops to 0.19%, meaning almost every access hits in the prefetched cacheline.
 
 **Analysis:**
-- **Cacheline size is the ONLY factor that matters** — each doubling provides ~40% CPI improvement
+- **Cacheline size is the ONLY factor that matters**
 - **2048B cacheline** reduced CPI from 3.494 → 1.496 (**57% improvement!**)
 - L1d miss rate dropped from 6.1% (64B) → 0.19% (2048B) — **32× reduction**
 - Cache size variations (32kB→128kB L1d, 128kB→2MB L2) showed **zero impact** with 2048B cacheline
@@ -502,21 +486,6 @@ Based on Part 1 analysis, we designed **targeted cache configurations** for each
 - **2048B cacheline achieved 70% CPI reduction** (10.271 → 3.084)
 - Unlike speclibm, additional L1d tuning provided **small but measurable benefit** (3.084 → 3.072)
 - L1d miss rate reduced from 12.18% (64B) → 0.38% (2048B) — **32× reduction**
-- Why sjeng benefits from cacheline despite random access:
-  - **Hash table locality:** Transposition table entries clustered by hash bucket
-  - **Game tree locality:** Child nodes often allocated near parent in memory
-  - **Move generation:** Piece data structures accessed in predictable patterns
-
-**Comparison with speclibm:**
-
-| Metric | speclibm | specsjeng | Implication |
-|--------|----------|-----------|-------------|
-| L2 Miss Rate | 99.99% | 99.99% | Both severely memory-bound |
-| L1d Miss Rate (64B) | 6.1% | 12.18% | sjeng has 2× more memory traffic |
-| Final CPI (2048B) | 1.496 | 3.072 | sjeng still 2× worse despite optimization |
-| CPI Improvement | 57% | 70% | sjeng had more room for improvement |
-
-**Conclusion:** Maximize cacheline to 2048B for maximum benefit. Additional L1d improvements provide marginal gains. The residual 3.072 CPI represents the memory-bound floor — no cache optimization can hide 99.99% L2 miss rate.
 
 ![SJENG CPI Progression](plots/task2/specsjeng_cpi_progression.png)
 *Figure 6: SJENG optimization journey showing 70% CPI reduction through cacheline scaling.*
