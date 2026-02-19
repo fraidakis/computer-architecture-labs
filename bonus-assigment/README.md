@@ -526,12 +526,12 @@ A cache chip consists of three main components, each with distinct cost characte
 │                    CACHE CHIP                       │
 ├─────────────────────────────────────────────────────┤
 │  ┌───────────────────────────────────────────────┐  │
-│  │             DATA ARRAY (90-95%)               │  │ ← Fixed by capacity
+│  │             DATA ARRAY (95%)                  │  │ ← Fixed by capacity
 │  │         Stores actual cache data              │  │    NOT affected by
 │  │         Size = Capacity in bits               │  │    associativity
 │  └───────────────────────────────────────────────┘  │
 │  ┌─────────────────────┐ ┌─────────────────────┐    │
-│  │   TAG ARRAY (3-5%)  │ │  LOGIC (2-5%)       │    │ ← Scales with:
+│  │   TAG ARRAY (4%)    │ │  LOGIC (1%)         │    │ ← Scales with:
 │  │   Stores addresses  │ │  Comparators, MUX   │    │    - Associativity
 │  │   Size ∝ 1/LineSize │ │  Decoders, LRU      │    │    - 1/LineSize
 │  └─────────────────────┘ └─────────────────────┘    │
@@ -577,39 +577,40 @@ Each cache line needs a **tag** to identify which memory address it holds.
 **Tag Calculation:**
 
 For a cache with:
-- Capacity $S$ (in bytes)
-- Line size $CL$ (in bytes)
+- Capacity $S$ (in KB)
+- Line/Block size $CL$ (in bytes)
 - Associativity $W$ (ways)
 - Address width $A_w$ (typically 32 or 48 bits)
 
-Number of lines: $N = \frac{S}{CL}$
+Number of blocks: $N = \frac{S}{CL}$
 
 Number of sets: $Sets = \frac{N}{W} = \frac{S}{CL \times W}$
 
 Tag width: $T_w = A_w - \log_2(CL) - \log_2(Sets)$
 
 **Simplified (for 32-bit address):**
-$$T_w \approx 32 - \log_2(CL) - \log_2\left(\frac{S}{CL \times W}\right)$$
+$$T_w \approx \underbrace{32}_{\text{address bits}} - \underbrace{\log_2(CL)}_{\text{offset bits (byte in block)}} - \underbrace{\log_2(Sets)}_{\text{index bits (which set)}}$$
 
-**Status bits per line:**
+**Status bits per block:**
 $$\sigma = 1 \text{ (valid)} + 1 \text{ (dirty)} + \lceil\log_2(W)\rceil \text{ (LRU)} \approx 2 + \log_2(W)$$
 
-**Tag Array Size:**
+**Tag Array Size (in bits):**
 $$A_{tag} = N \times (T_w + \sigma) = \frac{S}{CL} \times (T_w + \sigma)$$
 
 **Key Insight:** Tag area scales as **1/CL** — larger cachelines mean fewer lines, hence fewer tags!
 
+Since $S_i$ is in **KB** and $CL$ in **bytes**, the ratio $S_i/CL$ implicitly carries a ×1024 factor (KB→bytes). Converting the tag result from bits→KB requires ÷(8×1024), but the ×1024 and ÷1024 cancel, leaving only **÷8** (bits→bytes):
+
 $$
-\boxed{C_{tag} = \sum_{i \in \{L1,L2\}} \frac{S_i}{CL} \times (T_{w,i} + \sigma_i) \times \gamma_i}
+\boxed{C_{tag} = \sum_{i \in \{L1,L2\}} \frac{S_i}{CL} \times \frac{(T_{w,i} + \sigma_i)}{8} \times \gamma_i}
 $$
 
 ##### Step 3: Logic Overhead Cost
 
-Associativity requires additional logic:
-- **N comparators** (one per way)
-- **N:1 MUX** for data selection
-- **Priority encoder** for hit detection
-- **LRU/PLRU tracking** hardware
+Associativity requires additional logic per set:
+- **W comparators** (one per way, each comparing $T_w$ tag bits)
+- **W:1 MUX** for data selection (picks the hitting way's data)
+- **LRU tracking** hardware
 
 This logic scales with:
 1. Number of ways (W)
@@ -622,7 +623,7 @@ $$C_{logic} = C_{tag} \times \delta \times W$$
 Where $\delta \approx 0.02$ (2% per way) based on cache design literature (comparator + MUX overhead per way).
 
 $$
-\boxed{C_{logic} = \sum_{i \in \{L1,L2\}} \frac{S_i}{CL} \times (T_{w,i} + \sigma_i) \times \gamma_i \times \delta \times W_i}
+\boxed{C_{logic} = \sum_{i \in \{L1,L2\}} \frac{S_i}{CL} \times \frac{(T_{w,i} + \sigma_i)}{8} \times \gamma_i \times \delta \times W_i}
 $$
 
 ##### Step 4: Complete Physical Model
@@ -630,7 +631,7 @@ $$
 Combining all components:
 
 $$
-\boxed{C_{total} = \underbrace{(S_{L1} \cdot \gamma_{L1}) + (S_{L2} \cdot \gamma_{L2})}_{\text{Data Array Cost}} + \underbrace{\sum_{i=L1,L2} \left( \frac{S_{i}}{CL} \cdot (T_{w,i} + \sigma_i) \cdot \gamma_{i} \cdot (1 + \delta \cdot W_i) \right)}_{\text{Tag and Logic Overhead}}}
+\boxed{C_{total} = \underbrace{(S_{L1} \cdot \gamma_{L1}) + (S_{L2} \cdot \gamma_{L2})}_{\text{Data Array Cost (KB)}} + \underbrace{\sum_{i=L1,L2} \left( \frac{S_{i}}{CL} \cdot \frac{(T_{w,i} + \sigma_i)}{8} \cdot \gamma_{i} \cdot (1 + \delta \cdot W_i) \right)}_{\text{Tag and Logic Overhead (KB)}}}
 $$
 
 **Parameter Values:**
@@ -650,7 +651,7 @@ $$
 For optimization loops where the full bit-level calculation is cumbersome, we derive a **calibrated approximation**:
 
 $$
-\boxed{C_{approx} = 2.0 \cdot S_{L1} + 1.0 \cdot S_{L2} + S_{total} \times \frac{A_w}{CL \times 8} \times (1 + 0.05 \cdot \overline{W})}
+\boxed{C_{approx} = 2.0 \cdot S_{L1} + 1.0 \cdot S_{L2} + S_{total} \times \frac{A_w}{CL \times 8} \times (1 + 0.02 \cdot \overline{W})}
 $$
 
 **Where:**
@@ -658,15 +659,6 @@ $$
 - $CL$ = Cacheline size in bytes
 - $A_w$ = Address width in bits (32 for this system)
 - $\overline{W}$ = Average associativity across caches
-
-**Component Breakdown:**
-
-| Component | Simplified Term | Physical Meaning |
-|-----------|-----------------|------------------|
-| $2.0 \cdot S_{L1}$ | L1 Data Array | 8T cells are 2× larger |
-| $1.0 \cdot S_{L2}$ | L2 Data Array | 6T baseline |
-| $\frac{A_w}{CL \times 8}$ | Tag Overhead | Larger lines → fewer tags |
-| $(1 + 0.05 \cdot W)$ | Logic Overhead | ~5% per way on overhead only |
 
 ---
 
@@ -677,7 +669,7 @@ $$
 | L1 vs L2 cell area | Intel Skylake Die Analysis (WikiChip) | 8T: ~0.082 μm², 6T: ~0.050 μm² → **1.64×** |
 | SRAM cell scaling | ISSCC Papers (2015-2020) | 8T cells ~1.5-2× larger than 6T |
 | Tag overhead | H&P 6th Ed., Chapter 2 | Tag bits = Addr - log(Line) - log(Sets) |
-| Associativity logic | Computer Architecture textbooks | N comparators + N:1 MUX per set |
+| Associativity logic | Computer Architecture textbooks | W comparators + W:1 MUX per set |
 
 ---
 
@@ -689,15 +681,15 @@ Using the physical model: $C = 2 \cdot S_{L1} + S_{L2} + \text{TagOverhead}$
 
 | Benchmark | Configuration | Data Cost | Tag Overhead | **Total Cost** | **CPI** | **CPI × Cost** |
 |-----------|---------------|-----------|--------------|----------------|---------|----------------|
-| **spechmmer** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 1.188 | 2,798 |
-| | Optimized (128KB L1, 512KB, 256B, 2-way) | 768 | 8 | 776 | **1.177** | **914** |
-| **specmcf** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 1.294 | 3,047 |
-| | Optimized (96KB L1, 2MB, 512B, 4-way) | 2,240 | 14 | 2,254 | **1.105** | **2,491** |
-| **specbzip** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 1.680 | 3,956 |
-| | Optimized (160KB L1, 4MB, 256B, 16-way) | 4,416 | 78 | 4,494 | **1.589** | **7,141** |
-| **speclibm** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 3.494 | 8,228 |
+| **spechmmer** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 96 | 2,336 | 1.188 | 2,775 |
+| | Optimized (128KB L1, 512KB, 256B, 2-way) | 768 | 8 | 776 | **1.177** | **913** |
+| **specmcf** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 96 | 2,336 | 1.294 | 3,023 |
+| | Optimized (96KB L1, 2MB, 512B, 4-way) | 2,240 | 12 | 2,252 | **1.105** | **2,488** |
+| **specbzip** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 96 | 2,336 | 1.680 | 3,925 |
+| | Optimized (160KB L1, 4MB, 256B, 16-way) | 4,416 | 58 | 4,474 | **1.589** | **7,109** |
+| **speclibm** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 96 | 2,336 | 3.494 | 8,162 |
 | | Optimized (**32KB L1, 128KB L2**, 2048B, 1-way) | **192** | **0.2** | **192** | **1.496** | **288** |
-| **specsjeng** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 115 | 2,355 | 10.271 | 24,188 |
+| **specsjeng** | Default (96KB L1, 2MB L2, 64B, 4-way) | 2,240 | 96 | 2,336 | 10.271 | 23,994 |
 | | Optimized (144KB L1, 512KB L2, 2048B, 4-way) | 800 | 1 | 801 | **3.072** | **2,461** |
 
 ---
@@ -731,8 +723,8 @@ Our cost-performance analysis consistently points to **extreme cacheline sizes (
 
 The speclibm configuration (32KB L1, 128KB L2, 2048B line) achieves:
 - **CPI = 1.496** (57% better than baseline)
-- **Cost = 195 units** (94% cheaper than baseline)
-- **CPI × Cost = 292** (the lowest value seen in all experiments)
+- **Cost = 192 units** (92% cheaper than baseline)
+- **CPI × Cost = 288** (the lowest value seen in all experiments)
 
 #### The Physical Reality: Why 2048B Lines Are Unimplementable
 

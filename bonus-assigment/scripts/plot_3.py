@@ -75,17 +75,18 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # =============================================================================
 # C_total = C_data + C_tag + C_logic
 #
-# C_data = S_L1 × γ_L1 + S_L2 × γ_L2
-# C_tag  = Σ (S_i / CL) × (T_w + σ) × γ_i
+# C_data = S_L1 × γ_L1 + S_L2 × γ_L2           (all sizes in KB)
+# C_tag  = Σ (S_i / CL) × (T_w + σ) / 8 × γ_i  (÷8 converts tag bits → bytes;
+#                                                  ×1024 from KB/B and ÷1024 cancel)
 # C_logic = C_tag × δ × W
 #
-# Combined: C = (S_L1 × γ_L1 + S_L2 × γ_L2) + Σ (S_i/CL × (T_w + σ) × γ_i × (1 + δ × W_i))
+# Combined: C = (S_L1 × γ_L1 + S_L2 × γ_L2) + Σ (S_i/CL × (T_w + σ)/8 × γ_i × (1 + δ × W_i))
 
 COST_PARAMS = {
     'GAMMA_L1': 2.0,          # L1 cell density factor (8T SRAM ~2× larger than 6T)
     'GAMMA_L2': 1.0,          # L2 baseline (6T SRAM)
     'ADDR_WIDTH': 32,         # Address width in bits
-    'DELTA': 0.05,            # Logic overhead per way (~5% per way on tag+logic)
+    'DELTA': 0.02,            # Logic overhead per way (~2% comparator/mux per way)
 }
 
 # =============================================================================
@@ -206,15 +207,19 @@ def calculate_cost(config: Dict) -> float:
     
     Formula: C_total = C_data + C_tag_and_logic
     
-    C_data = S_L1 × γ_L1 + S_L2 × γ_L2
-    C_tag_and_logic = Σ (S_i / CL) × (T_w + σ) × γ_i × (1 + δ × W_i)
+    C_data = S_L1 × γ_L1 + S_L2 × γ_L2              (sizes in KB)
+    C_tag_and_logic = Σ (S_i/CL) × (T_w + σ)/8 × γ_i × (1 + δ × W_i)
+    
+    Note: S_i is in KB and CL in bytes, so S_i/CL carries an implicit ×1024.
+    The bits→KB conversion needs ÷(8×1024), but the ×1024 and ÷1024 cancel,
+    leaving only ÷8 (bits→bytes).
     
     Where:
     - γ_L1 = 2.0: L1 cell density factor (8T SRAM ~2× larger than 6T)
     - γ_L2 = 1.0: L2 baseline (6T SRAM)
     - T_w: Tag width in bits
     - σ: Status bits (valid + dirty + LRU)
-    - δ = 0.05: Logic overhead per way
+    - δ = 0.02: Logic overhead per way (~2% comparator/mux per way)
     """
     p = COST_PARAMS
     
@@ -228,27 +233,20 @@ def calculate_cost(config: Dict) -> float:
     # Data Array Cost: C_data = S_L1 × γ_L1 + S_L2 × γ_L2
     c_data = (l1_total_kb * p['GAMMA_L1']) + (l2_kb * p['GAMMA_L2'])
     
-    # Tag & Logic Overhead for L1i
+    # Tag & Logic Overhead for L1i: (S_KB / CL) × (T_w + σ) / 8 × γ × (1 + δ × W)
     l1i_tag_w = calculate_tag_width(l1i_kb, cl, config['L1i_assoc'])
     l1i_status = calculate_status_bits(config['L1i_assoc'])
-    l1i_num_lines = (l1i_kb * 1024) / cl
-    l1i_overhead = l1i_num_lines * (l1i_tag_w + l1i_status) * p['GAMMA_L1'] * (1 + p['DELTA'] * config['L1i_assoc'])
-    # Scale down to KB-equivalent units (divide by 8*1024 to convert bits to KB)
-    l1i_overhead = l1i_overhead / (8 * 1024)
+    l1i_overhead = (l1i_kb / cl) * (l1i_tag_w + l1i_status) / 8 * p['GAMMA_L1'] * (1 + p['DELTA'] * config['L1i_assoc'])
     
-    # Tag & Logic Overhead for L1d
+    # Tag & Logic Overhead for L1d: (S_KB / CL) × (T_w + σ) / 8 × γ × (1 + δ × W)
     l1d_tag_w = calculate_tag_width(l1d_kb, cl, config['L1d_assoc'])
     l1d_status = calculate_status_bits(config['L1d_assoc'])
-    l1d_num_lines = (l1d_kb * 1024) / cl
-    l1d_overhead = l1d_num_lines * (l1d_tag_w + l1d_status) * p['GAMMA_L1'] * (1 + p['DELTA'] * config['L1d_assoc'])
-    l1d_overhead = l1d_overhead / (8 * 1024)
+    l1d_overhead = (l1d_kb / cl) * (l1d_tag_w + l1d_status) / 8 * p['GAMMA_L1'] * (1 + p['DELTA'] * config['L1d_assoc'])
     
-    # Tag & Logic Overhead for L2
+    # Tag & Logic Overhead for L2: (S_KB / CL) × (T_w + σ) / 8 × γ × (1 + δ × W)
     l2_tag_w = calculate_tag_width(l2_kb, cl, config['L2_assoc'])
     l2_status = calculate_status_bits(config['L2_assoc'])
-    l2_num_lines = (l2_kb * 1024) / cl
-    l2_overhead = l2_num_lines * (l2_tag_w + l2_status) * p['GAMMA_L2'] * (1 + p['DELTA'] * config['L2_assoc'])
-    l2_overhead = l2_overhead / (8 * 1024)
+    l2_overhead = (l2_kb / cl) * (l2_tag_w + l2_status) / 8 * p['GAMMA_L2'] * (1 + p['DELTA'] * config['L2_assoc'])
     
     # Total tag/logic overhead
     c_tag_logic = l1i_overhead + l1d_overhead + l2_overhead
@@ -282,8 +280,7 @@ def calculate_cost_breakdown(config: Dict) -> Dict[str, float]:
                               (l2_kb, config['L2_assoc'], p['GAMMA_L2'])]:
         tw = calculate_tag_width(sz, cl, assoc)
         st = calculate_status_bits(assoc)
-        nlines = (sz * 1024) / cl
-        tag_overhead += nlines * (tw + st) * gamma * (1 + p['DELTA'] * assoc) / (8 * 1024)
+        tag_overhead += (sz / cl) * (tw + st) / 8 * gamma * (1 + p['DELTA'] * assoc)
     
     total = c_data + tag_overhead
     
