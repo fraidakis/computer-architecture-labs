@@ -586,10 +586,8 @@ Number of blocks: $N = \frac{S}{CL}$
 
 Number of sets: $Sets = \frac{N}{W} = \frac{S}{CL \times W}$
 
-Tag width: $T_w = A_w - \log_2(CL) - \log_2(Sets)$
-
-**Simplified (for 32-bit address):**
-$$T_w \approx \underbrace{32}_{\text{address bits}} - \underbrace{\log_2(CL)}_{\text{offset bits (byte in block)}} - \underbrace{\log_2(Sets)}_{\text{index bits (which set)}}$$
+**Tag width:**
+$$T_w = \underbrace{A_w}_{\text{address width}} - \underbrace{\log_2(CL)}_{\text{offset (select byte)}} - \underbrace{\log_2(Sets)}_{\text{index (select set)}}$$
 
 **Status bits per block:**
 $$\sigma = 1 \text{ (valid)} + 1 \text{ (dirty)} + \lceil\log_2(W)\rceil \text{ (LRU)} \approx 2 + \log_2(W)$$
@@ -608,7 +606,7 @@ $$
 ##### Step 3: Logic Overhead Cost
 
 Associativity requires additional logic per set:
-- **W comparators** (one per way, each comparing $T_w$ tag bits)
+  - **W comparators** (one per way, each comparing $T_w$ tag bits)
 - **W:1 MUX** for data selection (picks the hitting way's data)
 - **LRU tracking** hardware
 
@@ -618,9 +616,9 @@ This logic scales with:
 
 We model this as a **percentage overhead on the tag structure:**
 
-$$C_{logic} = C_{tag} \times \delta \times W$$
+$$C_{logic} = \underbrace{C_{tag}}_{\text{tag array cost}} \times \underbrace{\delta}_{\text{cost of 1 comparator}} \times \underbrace{W}_{\text{number of ways}}$$
 
-Where $\delta \approx 0.02$ (2% per way) based on cache design literature (comparator + MUX overhead per way).
+> **$\delta \approx 0.02$ (2% per way)** — each way needs a comparator + MUX share. A single comparator costs ~2% of the tag array, so W ways cost $\delta \times W$ of the tag cost, based on cache design literature.
 
 $$
 \boxed{C_{logic} = \sum_{i \in \{L1,L2\}} \frac{S_i}{CL} \times \frac{(T_{w,i} + \sigma_i)}{8} \times \gamma_i \times \delta \times W_i}
@@ -710,42 +708,63 @@ Using the physical model: $C = 2 \cdot S_{L1} + S_{L2} + \text{TagOverhead}$
 
 ### The "2048B Cacheline" Illusion
 
-Our cost-performance analysis consistently points to **extreme cacheline sizes (2048B)** as the optimal solution. Before drawing conclusions, we must understand *why* simulation rewards this configuration and *why* real CPUs don't implement it.
+Our cost-performance analysis consistently points to **extreme cacheline sizes (2048B)** as the optimal solution. Before drawing conclusions, we must separate the *real* source of the simulated gains from the misleading ones — and understand why real CPUs never do this.
 
-#### Why 2048B Cachelines Appear Optimal
-
-| Benefit in Simulation | Mechanism |
-|-----------------------|-----------|
-| **Tag Array Reduction** | 2048B lines = 32× fewer cache lines → 32× fewer tags → 32× less tag SRAM |
-| **Implicit Prefetching** | Loading 2048B per miss amortizes memory latency over many subsequent accesses |
-| **Miss Rate Collapse** | For streaming workloads (speclibm, specsjeng), L1d miss rate drops from ~6-12% → ~0.2% |
-| **Cost Model Savings** | Tag overhead term ($S/CL$) shrinks dramatically, slashing total cost |
+#### Dissecting the Simulated Gains
 
 The speclibm configuration (32KB L1, 128KB L2, 2048B line) achieves:
 - **CPI = 1.496** (57% better than baseline)
 - **Cost = 192 units** (92% cheaper than baseline)
 - **CPI × Cost = 288** (the lowest value seen in all experiments)
 
-#### The Physical Reality: Why 2048B Lines Are Unimplementable
+These gains come from **two very different mechanisms**, one dominant and one negligible:
+
+##### 1. Miss Rate Collapse via Implicit Prefetching (≈100% of CPI gain)
+
+This is the **real engine** behind the performance improvement. A 2048B cacheline acts as a massive implicit prefetch — every miss loads 32× more data than a 64B line. For streaming workloads:
+
+| Metric | 64B Cacheline | 2048B Cacheline | Effect |
+|--------|:---:|:---:|--------|
+| **L1d miss rate (speclibm)** | 6.10% | 0.19% | **32× fewer misses** |
+| **L1d miss rate (specsjeng)** | 12.18% | 0.38% | **32× fewer misses** |
+
+In gem5's memory model, the **latency of a cache miss is roughly the same regardless of how many bytes are transferred**. The simulator models a fixed DRAM access latency (row activation + CAS), and the additional burst transfers for a 2048B line add very little simulated time compared to the initial access latency. This means 2048B lines get 32× fewer misses at essentially **no extra penalty per miss** — a free lunch that doesn't exist in real hardware.
+
+##### 2. Tag Cost Reduction (≈4% of total cost — marginal)
+
+While 2048B lines do reduce tag count by 32×, this sounds more impressive than it is. Looking at our actual cost data:
+
+| Config | Data Cost | Tag Cost | Tag as % of Total |
+|--------|:---------:|:--------:|:------------------:|
+| Default (64B line) | 2,240 | 96 | **4.1%** |
+| speclibm opt (2048B line) | 192 | 0.2 | **0.1%** |
+
+Tags were already only **~4% of total cost** with 64B lines. Reducing them 32× saves ~96 cost units — meaningful, but dwarfed by the data array cost savings that come from **shrinking the caches themselves** (which is only possible *because* the massive cacheline collapses the miss rate). The tag reduction is a secondary side-effect, not the driver.
+
+#### Why Real Hardware Cannot Exploit This
+
+The simulation results are an **artifact of gem5's idealized memory model**. In real silicon, 2048B lines would be catastrophic:
 
 | Hardware Constraint | Impact of 2048B Lines |
 |---------------------|----------------------|
-| **Memory Bus Bandwidth** | DDR3/4/5 buses are 64-bits wide. A 2048B line requires **256 consecutive burst transfers** — holding the bus for ~160ns (at DDR3-1600 speeds) |
-| **Fill Buffer Blocking** | During those 160ns, all other pending loads/stores wait. A single L1 miss stalls *all* memory traffic for ~320 CPU cycles (at 2GHz) |
-| **Latency Sensitivity** | Latency-critical workloads (databases, web servers) cannot tolerate 100+ cycle stalls on every miss |
+| **Bus Occupation Time** | DDR3/4/5 buses are 64-bits wide. A 2048B fill requires **256 consecutive burst transfers**, holding the bus for ~160ns at DDR3-1600 speeds — vs. ~10ns for a 64B line. gem5 does **not** model this bus blocking realistically |
+| **Miss Penalty Explosion** | In reality, each miss would cost ~320 CPU cycles (at 2GHz) instead of ~50 cycles. The "free prefetch" illusion disappears: you pay for **every byte transferred** |
+| **Bandwidth Waste** | If a program needs a single 4-byte integer, a 2048B line fetches **512× more data** than needed. For workloads with poor spatial locality, >99% of fetched data is never used (internal fragmentation) |
+| **Fill Buffer Blocking** | During the 160ns bus transfer, **all** other pending loads/stores are stalled. One L1 miss blocks the entire memory pipeline |
+| **Multi-core Coherence** | On a cache write, the entire 2048B line must be invalidated across all cores — generating **32× more coherence traffic** than 64B lines (false sharing) |
 
-#### Why Real CPUs Use 64B Lines
+#### Why Real CPUs Converge on 64B Lines
 
-Modern processors (Intel, AMD, ARM) have converged on **64-byte cachelines** as the sweet spot:
+Modern processors (Intel, AMD, ARM) use **64-byte cachelines** because they match the physical constraints of DRAM:
 
-| Consideration | 64B Choice Rationale |
-|---------------|----------------------|
-| **DDR Burst Alignment** | 64B = 8 transfers × 8 bytes = matches natural DDR burst (BL8) |
-| **Miss Penalty** | ~40-80ns latency is tolerable; 160ns+ is catastrophic for IPC |
-| **False Sharing** | 64B granularity limits multi-core coherence traffic |
-| **Prefetcher Synergy** | Hardware prefetchers (stride, stream) achieve "large line" effect *without* the bus contention |
+| Consideration | 64B Rationale |
+|---------------|---------------|
+| **DDR Burst Alignment** | 64B = 8 transfers × 8 bytes = one natural DDR burst (BL8). The line fills in a **single, atomic bus transaction** |
+| **Miss Penalty** | ~10ns bus time + ~40-50ns DRAM latency ≈ 50-80 cycles — tolerable for out-of-order CPUs to hide |
+| **Hardware Prefetchers** | Stride and stream prefetchers achieve the *same effect* as large cachelines — fetching adjacent data ahead of time — **without** blocking the bus or wasting bandwidth on unused data |
+| **False Sharing** | 64B granularity minimizes unnecessary coherence invalidations in multi-core systems |
 
-> **Simulation Verdict:** 2048B lines are an *artifact of the simulator's idealized memory model* — gem5 doesn't penalize bus blocking, coherence traffic, or fill buffer depth. In real silicon, 128B is the practical maximum.
+> **Simulation Verdict:** 2048B lines exploit a gap in gem5's memory model — the simulator charges roughly the same penalty for a 2048B transfer as for a 64B transfer, making implicit prefetching appear "free." In real silicon, the bus blocking and bandwidth costs would **negate most of the miss-rate gains**. The practical maximum cacheline size is **128B** (used in some IBM POWER processors), with 64B being the industry standard.
 
 ---
 
